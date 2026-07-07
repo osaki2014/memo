@@ -178,6 +178,94 @@
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
     }
 
+    .canvas.tag-3d {
+      perspective: 1100px;
+      transform-style: preserve-3d;
+      overflow: visible;
+      background-size: 56px 56px;
+    }
+
+    .canvas.tag-3d .note {
+      width: 220px !important;
+      height: 168px !important;
+      min-height: 168px;
+      border-radius: 2px;
+      resize: none;
+      transform-style: preserve-3d;
+      transition: transform .28s ease, left .28s ease, top .28s ease, box-shadow .2s ease;
+    }
+
+    .canvas.tag-3d .note::after {
+      content: "";
+      position: absolute;
+      inset: 8px -10px -10px 8px;
+      border-radius: 2px;
+      background: rgba(32,33,36,.09);
+      transform: translateZ(-20px);
+      z-index: -1;
+    }
+
+    .canvas.tag-3d.view-front .note { transform: translateZ(var(--z, 0px)); }
+    .canvas.tag-3d.view-top .note { transform: rotateX(62deg) translateZ(var(--z, 0px)); }
+    .canvas.tag-3d.view-bottom .note { transform: rotateX(-62deg) translateZ(var(--z, 0px)); }
+    .canvas.tag-3d.view-left .note { transform: rotateY(-50deg) translateZ(var(--z, 0px)); }
+    .canvas.tag-3d.view-right .note { transform: rotateY(50deg) translateZ(var(--z, 0px)); }
+
+    .tag-3d-controls {
+      position: sticky;
+      top: 58px;
+      left: 10px;
+      z-index: 16;
+      width: fit-content;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      padding: 8px;
+      border: 1px solid rgba(218,220,224,.9);
+      border-radius: 8px;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 6px 18px rgba(60,64,67,.12);
+    }
+
+    .depth-mode {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 0 9px;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .view-cube {
+      display: grid;
+      grid-template-columns: repeat(3, 28px);
+      grid-template-rows: repeat(3, 28px);
+      gap: 2px;
+      padding: 4px;
+      border-radius: 6px;
+      background: #f1f3f4;
+      box-shadow: inset -3px -3px 0 rgba(60,64,67,.12), inset 3px 3px 0 rgba(255,255,255,.8);
+    }
+
+    .view-cube button {
+      width: 28px;
+      height: 28px;
+      min-width: 0;
+      padding: 0;
+      border-radius: 4px;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 760;
+      background: #fff;
+    }
+
+    .view-cube button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
     .tag-shelf {
       position: sticky;
       top: 10px;
@@ -837,6 +925,10 @@
           <option value="tag">タグ順に整列</option>
           <option value="updated">最新更新順に整列</option>
         </select>
+        <select id="depthModeSelect" class="sort-control" title="3D奥行き" hidden>
+          <option value="even">奥行き均等</option>
+          <option value="time">時系列</option>
+        </select>
         <button id="addNote" class="primary" title="新規メモ">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           新規
@@ -932,11 +1024,13 @@
     let tagDrag = null;
     let imageTargetId = null;
     let threeRuntime = null;
+    let tag3dView = "front";
 
     const el = {
       app: document.getElementById("app"),
       canvas: document.getElementById("canvas"),
       arrangeSelect: document.getElementById("arrangeSelect"),
+      depthModeSelect: document.getElementById("depthModeSelect"),
       addNote: document.getElementById("addNote"),
       importKeepBtn: document.getElementById("importKeepBtn"),
       keepImportInput: document.getElementById("keepImportInput"),
@@ -992,9 +1086,17 @@
     });
 
     el.arrangeSelect.addEventListener("change", () => {
+      el.depthModeSelect.hidden = el.arrangeSelect.value !== "tag";
       if (el.arrangeSelect.value !== "manual") {
         arrangeNotes(el.arrangeSelect.value);
+      } else {
+        tag3dView = "front";
+        renderNotes();
       }
+    });
+
+    el.depthModeSelect.addEventListener("change", () => {
+      if (el.arrangeSelect.value === "tag") arrangeNotes("tag");
     });
 
     el.addNote.addEventListener("click", () => {
@@ -1433,6 +1535,39 @@
       return `<button class="tag-sticker${noteId ? " attached" : ""}" draggable="true" data-tag="${escapeAttr(tag)}" ${source}>${escapeHtml(tag)}</button>`;
     }
 
+    function renderTag3DControls() {
+      const active = (view) => view === tag3dView ? " active" : "";
+      return `
+        <div class="tag-3d-controls">
+          <select class="depth-mode" id="inlineDepthMode" title="奥行きモード">
+            <option value="even"${el.depthModeSelect.value === "even" ? " selected" : ""}>奥行き均等</option>
+            <option value="time"${el.depthModeSelect.value === "time" ? " selected" : ""}>時系列</option>
+          </select>
+          <div class="view-cube" aria-label="ビューキューブ">
+            <span></span><button data-view="top" class="${active("top")}">上</button><span></span>
+            <button data-view="left" class="${active("left")}">左</button><button data-view="front" class="${active("front")}">前</button><button data-view="right" class="${active("right")}">右</button>
+            <span></span><button data-view="bottom" class="${active("bottom")}">下</button><span></span>
+          </div>
+        </div>
+      `;
+    }
+
+    function wireTag3DControls() {
+      const inlineMode = document.getElementById("inlineDepthMode");
+      if (inlineMode) {
+        inlineMode.addEventListener("change", () => {
+          el.depthModeSelect.value = inlineMode.value;
+          arrangeNotes("tag");
+        });
+      }
+      el.canvas.querySelectorAll("[data-view]").forEach(button => {
+        button.addEventListener("click", () => {
+          tag3dView = button.dataset.view;
+          renderNotes();
+        });
+      });
+    }
+
     function renderTags(note) {
       return note.tags.length ? note.tags.map(tag => renderTagSticker(tag, note.id)).join("") : "";
     }
@@ -1480,24 +1615,60 @@
         .filter(note => !note.parentId)
         .sort((a, b) => {
           if (mode === "color") return a.color.localeCompare(b.color) || a.title.localeCompare(b.title, "ja");
-          if (mode === "tag") return firstTag(a).localeCompare(firstTag(b), "ja") || a.title.localeCompare(b.title, "ja");
+          if (mode === "tag") return firstTag(a).localeCompare(firstTag(b), "ja") || new Date(b.updatedAt) - new Date(a.updatedAt);
           if (mode === "updated") return new Date(b.updatedAt) - new Date(a.updatedAt);
           return 0;
         });
 
-      const startX = 80;
-      const startY = 72;
-      const gapX = 390;
-      const gapY = 250;
-      const columns = 5;
-      sorted.forEach((note, index) => {
-        note.x = startX + (index % columns) * gapX;
-        note.y = startY + Math.floor(index / columns) * gapY;
-        note.updatedAt = now();
-      });
+      if (mode === "tag") {
+        arrangeTag3D(sorted);
+      } else {
+        arrangeFlat(sorted);
+      }
       persist();
       render();
       if (showToast) toast("メモを整列しました");
+    }
+
+    function arrangeFlat(sorted) {
+      const startX = 80;
+      const startY = 110;
+      const maxColumns = 4;
+      const columnWidth = Math.max(330, ...sorted.map(note => (note.w || 260) + 56));
+      const rowHeight = Math.max(230, ...sorted.map(note => (note.h || 188) + 58));
+      sorted.forEach((note, index) => {
+        note.x = startX + (index % maxColumns) * columnWidth;
+        note.y = startY + Math.floor(index / maxColumns) * rowHeight;
+      });
+    }
+
+    function arrangeTag3D(sorted) {
+      const groups = new Map();
+      sorted.forEach(note => {
+        const tag = firstTag(note) || "タグなし";
+        if (!groups.has(tag)) groups.set(tag, []);
+        groups.get(tag).push(note);
+      });
+      const allTimes = sorted.map(note => new Date(note.updatedAt).getTime());
+      const maxTime = Math.max(...allTimes, Date.now());
+      const minTime = Math.min(...allTimes, maxTime);
+      const timeRange = Math.max(1, maxTime - minTime);
+      const depthMode = el.depthModeSelect.value || "even";
+      let groupIndex = 0;
+      for (const notes of groups.values()) {
+        notes.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        notes.forEach((note, stackIndex) => {
+          note.x = 110 + groupIndex * 300 + stackIndex * 10;
+          note.y = 130 + stackIndex * 12;
+          note.w = 220;
+          note.h = 168;
+          const depth = depthMode === "time"
+            ? Math.round(((new Date(note.updatedAt).getTime() - minTime) / timeRange) * 320)
+            : (notes.length - 1 - stackIndex) * 70;
+          note.depth = depth;
+        });
+        groupIndex += 1;
+      }
     }
 
     function render() {
@@ -1507,13 +1678,20 @@
 
     function renderNotes() {
       const query = el.searchInput.value.trim().toLowerCase();
+      const isTag3D = el.arrangeSelect.value === "tag";
       const notes = [...state.notes]
         .filter(note => !note.parentId)
-        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt))
+        .sort((a, b) => {
+          if (isTag3D) return firstTag(a).localeCompare(firstTag(b), "ja") || new Date(b.updatedAt) - new Date(a.updatedAt);
+          return Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt);
+        })
         .filter(note => noteMatchesQuery(note, query));
 
-      el.canvas.innerHTML = renderTagShelf();
+      el.canvas.className = `canvas${isTag3D ? ` tag-3d view-${tag3dView}` : ""}`;
+      el.depthModeSelect.hidden = !isTag3D;
+      el.canvas.innerHTML = renderTagShelf() + (isTag3D ? renderTag3DControls() : "");
       wireTagShelf();
+      if (isTag3D) wireTag3DControls();
       notes.forEach(note => {
         const children = childNotes(note.id);
         const card = document.createElement("article");
@@ -1523,6 +1701,7 @@
         card.style.width = `${note.w || 260}px`;
         card.style.height = `${note.h || 188}px`;
         card.style.background = note.color;
+        card.style.setProperty("--z", `${note.depth || 0}px`);
         card.dataset.id = note.id;
         card.innerHTML = `
           <div class="note-head">
