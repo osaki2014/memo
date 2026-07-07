@@ -163,6 +163,11 @@
       inset: 0;
       overflow: auto;
       padding: 28px;
+      cursor: grab;
+    }
+
+    .board.panning {
+      cursor: grabbing;
     }
 
     .canvas {
@@ -259,61 +264,54 @@
       width: 96px;
       height: 96px;
       border-radius: 10px;
-      background:
-        linear-gradient(135deg, rgba(255,255,255,.96), rgba(241,243,244,.86));
-      box-shadow:
-        inset -4px -4px 0 rgba(60,64,67,.10),
-        inset 4px 4px 0 rgba(255,255,255,.86),
-        0 10px 24px rgba(60,64,67,.12);
+      perspective: 420px;
+      background: transparent;
+      box-shadow: none;
       transform-style: preserve-3d;
     }
 
     .view-cube button {
       position: absolute;
-      width: 34px;
-      height: 30px;
+      left: 28px;
+      top: 28px;
+      width: 40px;
+      height: 40px;
       min-width: 0;
       padding: 0;
-      border-radius: 5px;
+      border-radius: 2px;
       justify-content: center;
       font-size: 10px;
       font-weight: 760;
-      background: linear-gradient(145deg, #fff, #eef1f4);
+      background: rgba(255,255,255,.92);
       border: 1px solid rgba(189,193,198,.9);
       color: #3c4043;
-      box-shadow: 0 2px 5px rgba(60,64,67,.12);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.6);
+      transform-style: preserve-3d;
     }
 
     .view-cube button[data-view="top"] {
-      left: 31px;
-      top: 8px;
-      transform: skewX(-28deg) scaleY(.86);
-      transform-origin: bottom;
+      transform: rotateX(90deg) translateZ(20px);
     }
 
     .view-cube button[data-view="left"] {
-      left: 10px;
-      top: 38px;
-      transform: skewY(18deg);
+      transform: rotateY(-90deg) translateZ(20px);
     }
 
     .view-cube button[data-view="front"] {
-      left: 31px;
-      top: 38px;
       z-index: 2;
+      transform: translateZ(20px);
     }
 
     .view-cube button[data-view="right"] {
-      right: 10px;
-      top: 38px;
-      transform: skewY(-18deg);
+      transform: rotateY(90deg) translateZ(20px);
     }
 
     .view-cube button[data-view="bottom"] {
-      left: 31px;
-      bottom: 8px;
-      transform: skewX(28deg) scaleY(.86);
-      transform-origin: top;
+      transform: rotateX(-90deg) translateZ(20px);
+    }
+
+    .view-cube button[data-view="back"] {
+      transform: rotateY(180deg) translateZ(20px);
     }
 
     .view-cube button.active {
@@ -321,6 +319,13 @@
       color: #fff;
       border-color: var(--accent);
       box-shadow: 0 4px 12px rgba(26,115,232,.28);
+    }
+
+    .view-cube-shell {
+      position: absolute;
+      inset: 18px;
+      transform-style: preserve-3d;
+      transform: rotateX(-26deg) rotateY(38deg);
     }
 
     .tag-shelf {
@@ -1086,9 +1091,11 @@
     let tag3dView = "front";
     let boardMode = "2d";
     let markdownPreview = false;
+    let lastTag3DClick = null;
 
     const el = {
       app: document.getElementById("app"),
+      boardScroll: document.getElementById("boardScroll"),
       canvas: document.getElementById("canvas"),
       arrangeSelect: document.getElementById("arrangeSelect"),
       granularitySelect: document.getElementById("granularitySelect"),
@@ -1143,6 +1150,8 @@
     el.closeSideBtn.addEventListener("click", () => {
       el.app.classList.add("side-collapsed");
     });
+
+    el.boardScroll.addEventListener("pointerdown", startBoardPan);
 
     el.markdownToggle.addEventListener("click", () => {
       markdownPreview = !markdownPreview;
@@ -1623,9 +1632,14 @@
       return `
         <div class="tag-3d-controls">
           <div class="view-cube" aria-label="ビューキューブ">
-            <button data-view="top" class="${active("top")}">上</button>
-            <button data-view="left" class="${active("left")}">左</button><button data-view="front" class="${active("front")}">前</button><button data-view="right" class="${active("right")}">右</button>
-            <button data-view="bottom" class="${active("bottom")}">下</button>
+            <div class="view-cube-shell">
+              <button data-view="front" class="${active("front")}">前</button>
+              <button data-view="back" class="${active("back")}">後</button>
+              <button data-view="right" class="${active("right")}">右</button>
+              <button data-view="left" class="${active("left")}">左</button>
+              <button data-view="top" class="${active("top")}">上</button>
+              <button data-view="bottom" class="${active("bottom")}">下</button>
+            </div>
           </div>
         </div>
       `;
@@ -2271,6 +2285,33 @@
       drag = null;
     }
 
+    function startBoardPan(event) {
+      if (boardMode === "3d") return;
+      if (event.button !== 0 || event.target.closest(".note,.child-note,.tag-shelf,.tag-3d-controls,button,input,textarea,.markdown-preview")) return;
+      event.preventDefault();
+      const pan = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        scrollLeft: el.boardScroll.scrollLeft,
+        scrollTop: el.boardScroll.scrollTop
+      };
+      el.boardScroll.classList.add("panning");
+      el.boardScroll.setPointerCapture(event.pointerId);
+      const move = (moveEvent) => {
+        if (moveEvent.pointerId !== pan.pointerId) return;
+        el.boardScroll.scrollLeft = pan.scrollLeft - (moveEvent.clientX - pan.startX);
+        el.boardScroll.scrollTop = pan.scrollTop - (moveEvent.clientY - pan.startY);
+      };
+      const up = () => {
+        el.boardScroll.classList.remove("panning");
+        el.boardScroll.removeEventListener("pointermove", move);
+      };
+      el.boardScroll.addEventListener("pointermove", move);
+      el.boardScroll.addEventListener("pointerup", up, { once: true });
+      el.boardScroll.addEventListener("pointercancel", up, { once: true });
+    }
+
     function renderSidePanel() {
       if (historyMode === "tree") {
         renderTreeList();
@@ -2360,7 +2401,7 @@
       const canvas = document.getElementById("tag3dCanvas");
       if (!canvas) return;
       try {
-        const THREE = await loadThreeModule();
+        const { THREE, OrbitControls } = await loadThreeBundle();
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(el.canvas.clientWidth, el.canvas.clientHeight, false);
@@ -2382,6 +2423,20 @@
           5000
         );
         setTag3DCamera(camera);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = .08;
+        controls.enablePan = true;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.1;
+        controls.rotateSpeed = .72;
+        controls.screenSpacePanning = true;
+        controls.target.set(0, -120, 60);
+        controls.mouseButtons = {
+          LEFT: THREE.MOUSE.PAN,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE
+        };
 
         scene.add(new THREE.HemisphereLight(0xffffff, 0xdadce0, 2.2));
         const light = new THREE.DirectionalLight(0xffffff, 1.9);
@@ -2392,15 +2447,18 @@
         scene.add(light);
 
         const events = get3DBoardEvents(notes);
+        const selectable = [];
         const years = events.map(event => new Date(event.at).getFullYear());
         const minYear = Math.min(...years, new Date().getFullYear());
         const maxYear = Math.max(...years, minYear);
         const yearRange = Math.max(1, maxYear - minYear);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
         const categoryGap = 320;
+        const categoryBaseX = -420;
         const planeWidth = Math.max(1700, categories.length * categoryGap + 700);
         const planeDepth = 1200;
         const planeY = -300;
+        const centimeter = 20;
 
         const plane = new THREE.Mesh(
           new THREE.PlaneGeometry(planeWidth, planeDepth),
@@ -2411,17 +2469,11 @@
         plane.receiveShadow = true;
         scene.add(plane);
 
-        const grid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / 48), 0xc9cdd2, 0xe5e7eb);
+        const grid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / centimeter), 0xd2d6dc, 0xe6e8eb);
         grid.position.set(0, planeY, 160);
         grid.material.opacity = .9;
         grid.material.transparent = true;
         scene.add(grid);
-
-        const fineGrid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / 24), 0xe8eaed, 0xf1f3f4);
-        fineGrid.position.set(0, planeY + .5, 160);
-        fineGrid.material.opacity = .7;
-        fineGrid.material.transparent = true;
-        scene.add(fineGrid);
 
         const axisMaterial = new THREE.LineBasicMaterial({ color: 0x9aa0a6 });
         const yAxis = new THREE.BufferGeometry().setFromPoints([
@@ -2431,7 +2483,7 @@
         scene.add(new THREE.Line(yAxis, axisMaterial));
 
         categories.forEach((category, index) => {
-          const x = -((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
+          const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
           const label = makeLabel(THREE, category, el.classifySelect.value === "tag" ? "タグ" : "色", "");
           label.position.set(x, planeY + 24, -390);
           label.rotation.x = -Math.PI / 7;
@@ -2439,44 +2491,65 @@
         });
 
         for (let year = minYear; year <= maxYear; year++) {
-          const y = -170 + ((year - minYear) / yearRange) * 560;
+          const y = minYear === maxYear ? 80 : -170 + ((year - minYear) / yearRange) * 560;
           const label = makeLabel(THREE, `${year}`, "年", "");
           label.position.set(-planeWidth / 2 + 70, y, -430);
           scene.add(label);
-          const lineGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-planeWidth / 2 + 130, y, -420),
-            new THREE.Vector3(planeWidth / 2 - 130, y, -420)
+          const tickGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-planeWidth / 2 + 105, y, -420),
+            new THREE.Vector3(-planeWidth / 2 + 145, y, -420)
           ]);
-          scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .72 })));
+          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .9 })));
         }
 
         events.forEach((event, index) => {
           const catIndex = Math.max(0, categories.indexOf(event.category));
-          const x = -((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
-          const y = -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
-          const z = -230 + (index % 9) * 70;
+          const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
+          const y = minYear === maxYear ? 80 : -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
+          const z = -120 + (index % 9) * 76;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
+          selectable.push(card);
         });
 
-        renderer.render(scene, camera);
-        tag3dRuntime = { THREE, renderer, scene, camera };
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        const renderFrame = () => {
+          controls.update();
+          renderer.render(scene, camera);
+        };
+        const animate = () => {
+          if (!tag3dRuntime || tag3dRuntime.renderer !== renderer) return;
+          renderFrame();
+          requestAnimationFrame(animate);
+        };
+        tag3dRuntime = { THREE, renderer, scene, camera, controls, raycaster, pointer, selectable, selectedObject: null, renderFrame };
+        wireTag3DSceneEvents(canvas);
+        animate();
       } catch (error) {
         console.error(error);
         toast("タグ3Dシーンの描画に失敗しました");
       }
     }
 
-    async function loadThreeModule() {
+    async function loadThreeBundle() {
       const localUrl = new URL("./vendor/three/three.module.js", document.baseURI).href;
+      const localControlsUrl = new URL("./vendor/three/examples/jsm/controls/OrbitControls.js", document.baseURI).href;
       try {
         const response = await fetch(localUrl, { method: "HEAD", cache: "no-store" });
-        if (response.ok) return await import(localUrl);
+        const controlsResponse = await fetch(localControlsUrl, { method: "HEAD", cache: "no-store" });
+        if (response.ok && controlsResponse.ok) {
+          const THREE = await import(localUrl);
+          const { OrbitControls } = await import(localControlsUrl);
+          return { THREE, OrbitControls };
+        }
       } catch (error) {
         // CDN fallback below keeps GitHub Pages builds working when vendor files are absent.
       }
-      return await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+      const THREE = await import("https://esm.sh/three@0.160.0");
+      const { OrbitControls } = await import("https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js");
+      return { THREE, OrbitControls };
     }
 
     function setTag3DCamera(camera) {
@@ -2485,7 +2558,8 @@
         top: [0, 1480, 120],
         bottom: [0, -1260, 720],
         left: [-1260, 620, 340],
-        right: [1260, 620, 340]
+        right: [1260, 620, 340],
+        back: [-760, 720, -1120]
       };
       const [x, y, z] = positions[tag3dView] || positions.front;
       camera.position.set(x, y, z);
@@ -2508,6 +2582,7 @@
           })
           .map(event => ({
             ...event,
+            noteId: note.id,
             noteTitle: note.title,
             category,
             color: note.color,
@@ -2531,7 +2606,7 @@
 
     function makeEvent3DCard(THREE, event) {
       const group = new THREE.Group();
-      const geometry = new THREE.BoxGeometry(190, 78, 12);
+      const geometry = new THREE.BoxGeometry(240, 104, 16);
       const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(event.color || "#fff8c7"),
         roughness: .58,
@@ -2540,6 +2615,7 @@
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.userData.cardMesh = true;
       group.add(mesh);
 
       const label = makeCardTextureLabel(THREE, {
@@ -2548,9 +2624,110 @@
         tags: [event.category]
       });
       label.position.set(0, 0, 8);
+      label.scale.set(230, 92, 1);
       group.add(label);
 
+      group.userData.event = event;
+      group.userData.mesh = mesh;
+      group.userData.baseScale = 1;
       return group;
+    }
+
+    function wireTag3DSceneEvents(canvas) {
+      let down = null;
+      canvas.addEventListener("pointerdown", (event) => {
+        down = { x: event.clientX, y: event.clientY, at: Date.now() };
+        const card = pickTag3DCard(event) || tag3dRuntime?.selectedObject;
+        if (!card?.userData?.event?.noteId) return;
+        const noteId = card.userData.event.noteId;
+        if (lastTag3DClick?.noteId === noteId && down.at - lastTag3DClick.at < 650) {
+          event.preventDefault();
+          openTag3DCardIn2D(card);
+        }
+      });
+      canvas.addEventListener("click", (event) => {
+        if (!down || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 5) return;
+        const clickedAt = Date.now();
+        const card = pickTag3DCard(event);
+        if (!card) {
+          if (tag3dRuntime?.selectedObject) {
+            openTag3DCardIn2D(tag3dRuntime.selectedObject);
+          }
+          return;
+        }
+        const noteId = card.userData.event.noteId;
+        const alreadySelected = tag3dRuntime?.selectedObject?.userData?.event?.noteId === noteId;
+        const isDouble = alreadySelected || (lastTag3DClick?.noteId === noteId && clickedAt - lastTag3DClick.at < 650);
+        selectTag3DCard(card);
+        lastTag3DClick = { noteId, at: clickedAt };
+        if (isDouble) openTag3DCardIn2D(card);
+      });
+      canvas.addEventListener("dblclick", (event) => {
+        const card = pickTag3DCard(event) || tag3dRuntime?.selectedObject;
+        openTag3DCardIn2D(card);
+      });
+    }
+
+    function openTag3DCardIn2D(card) {
+      if (!card?.userData?.event?.noteId) return;
+      selectedId = card.userData.event.noteId;
+      boardMode = "2d";
+      lastTag3DClick = null;
+      el.view2DBtn.classList.add("active");
+      el.view3DBtn.classList.remove("active");
+      el.arrangeSelect.hidden = false;
+      el.granularitySelect.hidden = true;
+      el.classifySelect.hidden = true;
+      persist();
+      render();
+      const target = findNote(selectedId);
+      toast(target ? `${target.title} を2Dで開きました。編集すると新しい履歴として追加されます。` : "2Dに戻りました");
+    }
+
+    function pickTag3DCard(event) {
+      const runtime = tag3dRuntime;
+      if (!runtime) return null;
+      const rect = runtime.renderer.domElement.getBoundingClientRect();
+      runtime.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      runtime.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      runtime.raycaster.setFromCamera(runtime.pointer, runtime.camera);
+      const hits = runtime.raycaster.intersectObjects(runtime.selectable, true);
+      const hit = hits.find(item => nearestTag3DCard(item.object));
+      return hit ? nearestTag3DCard(hit.object) : null;
+    }
+
+    function nearestTag3DCard(object) {
+      let current = object;
+      while (current) {
+        if (current.userData?.event) return current;
+        current = current.parent;
+      }
+      return null;
+    }
+
+    function selectTag3DCard(card) {
+      const runtime = tag3dRuntime;
+      if (!runtime) return;
+      if (runtime.selectedObject && runtime.selectedObject !== card) {
+        setTag3DCardHighlight(runtime.selectedObject, false);
+      }
+      runtime.selectedObject = card;
+      selectedId = card.userData.event.noteId;
+      runtime.renderer.domElement.dataset.selected3d = selectedId;
+      persist();
+      setTag3DCardHighlight(card, true);
+      renderSidePanel();
+      runtime.renderFrame?.();
+    }
+
+    function setTag3DCardHighlight(card, active) {
+      const mesh = card.userData?.mesh;
+      if (mesh?.material) {
+        mesh.material.emissive = active ? new tag3dRuntime.THREE.Color(0x1a73e8) : new tag3dRuntime.THREE.Color(0x000000);
+        mesh.material.emissiveIntensity = active ? .28 : 0;
+        mesh.material.needsUpdate = true;
+      }
+      card.scale.setScalar(active ? 1.14 : 1);
     }
 
     function makeCardTextureLabel(THREE, note) {
