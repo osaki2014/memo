@@ -447,8 +447,31 @@
       padding-right: 18px;
     }
 
+    .note-move {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      padding: 0;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      cursor: grab;
+      color: var(--muted);
+      background: rgba(255,255,255,.48);
+      user-select: none;
+      touch-action: none;
+    }
+
+    .note-move:active,
+    .note.dragging .note-move {
+      cursor: grabbing;
+    }
+
     .note-title {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
       border: 0;
       background: transparent;
       font-weight: 760;
@@ -1182,6 +1205,7 @@
     el.arrangeSelect.addEventListener("change", () => {
       if (el.arrangeSelect.value !== "manual") {
         arrangeNotes(el.arrangeSelect.value);
+        el.arrangeSelect.value = "manual";
       } else {
         tag3dView = "front";
         renderNotes();
@@ -1844,6 +1868,7 @@
         card.dataset.id = note.id;
         card.innerHTML = `
           <div class="note-head">
+            <span class="note-move" title="メモを移動" role="button" tabindex="0">${iconMove()}</span>
             <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
           </div>
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
@@ -1873,8 +1898,11 @@
 
         const head = card.querySelector(".note-head");
         head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
+        card.querySelector(".note-move").addEventListener("pointerdown", (event) => startDrag(event, note, card));
+        head.addEventListener("mousedown", (event) => startMouseDrag(event, note, card));
+        card.querySelector(".note-move").addEventListener("mousedown", (event) => startMouseDrag(event, note, card));
         card.addEventListener("dblclick", (event) => {
-          if (event.target.closest("button,textarea")) return;
+          if (event.target.closest("button,textarea,.note-move")) return;
           toggleCollapsed(note);
         });
         wireNoteTagDrop(card, note);
@@ -2242,11 +2270,15 @@
     }
 
     function startDrag(event, note, card) {
-      if (event.target.closest("input,button,textarea")) return;
+      if (!event.target.closest(".note-move") && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      if (drag?.type === "note-mouse") return;
       event.preventDefault();
+      event.stopPropagation();
+      card.classList.add("dragging");
       card.setPointerCapture(event.pointerId);
       drag = {
         id: note.id,
+        type: "note-pointer",
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
@@ -2274,7 +2306,55 @@
 
     function endDrag(event) {
       const card = event.currentTarget;
+      card.classList.remove("dragging");
       card.removeEventListener("pointermove", onDrag);
+      if (drag?.moved) {
+        const note = findNote(drag.id);
+        if (note) {
+          note.updatedAt = now();
+          persist();
+        }
+      }
+      drag = null;
+    }
+
+    function startMouseDrag(event, note, card) {
+      if (event.button !== 0) return;
+      if (!event.target.closest(".note-move") && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      card.classList.add("dragging");
+      drag = {
+        id: note.id,
+        type: "note-mouse",
+        startX: event.clientX,
+        startY: event.clientY,
+        noteX: note.x,
+        noteY: note.y,
+        moved: false
+      };
+      window.addEventListener("mousemove", onMouseDrag);
+      window.addEventListener("mouseup", endMouseDrag, { once: true });
+    }
+
+    function onMouseDrag(event) {
+      if (!drag || drag.type !== "note-mouse") return;
+      const note = findNote(drag.id);
+      if (!note) return;
+      note.x = Math.max(0, drag.noteX + event.clientX - drag.startX);
+      note.y = Math.max(0, drag.noteY + event.clientY - drag.startY);
+      drag.moved = true;
+      const card = document.querySelector(`.note[data-id="${note.id}"]`);
+      if (card) {
+        card.style.left = `${note.x}px`;
+        card.style.top = `${note.y}px`;
+      }
+    }
+
+    function endMouseDrag() {
+      const card = drag ? document.querySelector(`.note[data-id="${drag.id}"]`) : null;
+      if (card) card.classList.remove("dragging");
+      window.removeEventListener("mousemove", onMouseDrag);
       if (drag?.moved) {
         const note = findNote(drag.id);
         if (note) {
