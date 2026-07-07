@@ -125,6 +125,16 @@
       margin-left: auto;
     }
 
+    .sort-control {
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 19px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 12px;
+      outline: none;
+    }
+
     .main {
       min-height: 0;
       display: grid;
@@ -173,6 +183,19 @@
       overflow: hidden;
     }
 
+    .note.collapsed {
+      min-height: 58px;
+      height: 58px !important;
+      resize: none;
+      grid-template-rows: auto;
+    }
+
+    .note.collapsed .note-meta,
+    .note.collapsed textarea,
+    .note.collapsed .note-body {
+      display: none;
+    }
+
     .note.selected {
       border-color: var(--accent);
       box-shadow: var(--shadow);
@@ -215,6 +238,39 @@
       line-height: 1.3;
     }
 
+    .tag-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tag-input {
+      width: 100%;
+      min-width: 0;
+      height: 28px;
+      border: 1px solid rgba(60,64,67,.16);
+      border-radius: 14px;
+      background: rgba(255,255,255,.56);
+      padding: 0 9px;
+      outline: none;
+      font-size: 12px;
+    }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      border-radius: 10px;
+      padding: 2px 7px;
+      background: rgba(32,33,36,.08);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 680;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
     .note textarea {
       width: 100%;
       min-height: 86px;
@@ -244,14 +300,19 @@
     }
 
     .child-notes {
-      display: grid;
-      gap: 7px;
+      position: relative;
       margin: 4px 0 8px;
-      max-height: 170px;
+      min-height: 38px;
+      height: var(--child-area-height, 190px);
+      max-height: 260px;
       overflow: auto;
+      border-radius: 8px;
     }
 
     .child-note {
+      position: absolute;
+      width: 190px;
+      min-height: 132px;
       border: 1px solid rgba(60,64,67,.18);
       border-left: 4px solid var(--accent-2);
       border-radius: 7px;
@@ -259,6 +320,45 @@
       padding: 7px;
       display: grid;
       gap: 5px;
+    }
+
+    .child-note.collapsed {
+      min-height: 38px;
+      height: 38px;
+      overflow: hidden;
+    }
+
+    .child-note.collapsed .child-text,
+    .child-note.collapsed .child-meta,
+    .child-note.collapsed .child-actions,
+    .child-note.collapsed .child-tags,
+    .child-note.collapsed .child-notes {
+      display: none;
+    }
+
+    .child-note.dragging {
+      opacity: .86;
+      z-index: 12;
+      box-shadow: var(--shadow);
+    }
+
+    .child-head {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .child-move {
+      width: 18px;
+      height: 18px;
+      border: 0;
+      border-radius: 9px;
+      padding: 0;
+      justify-content: center;
+      background: rgba(255,255,255,.66);
+      cursor: grab;
+      color: var(--muted);
     }
 
     .child-note.selected {
@@ -643,6 +743,12 @@
         <input id="searchInput" placeholder="メモを検索">
       </label>
       <div class="toolbar">
+        <select id="arrangeSelect" class="sort-control" title="整列">
+          <option value="manual">手動配置</option>
+          <option value="color">色順に整列</option>
+          <option value="tag">タグ順に整列</option>
+          <option value="updated">最新更新順に整列</option>
+        </select>
         <button id="addNote" class="primary" title="新規メモ">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           新規
@@ -726,6 +832,7 @@
 
     const el = {
       canvas: document.getElementById("canvas"),
+      arrangeSelect: document.getElementById("arrangeSelect"),
       addNote: document.getElementById("addNote"),
       historyBtn: document.getElementById("historyBtn"),
       timelineBtn: document.getElementById("timelineBtn"),
@@ -767,6 +874,12 @@
     }
 
     render();
+
+    el.arrangeSelect.addEventListener("change", () => {
+      if (el.arrangeSelect.value !== "manual") {
+        arrangeNotes(el.arrangeSelect.value);
+      }
+    });
 
     el.addNote.addEventListener("click", () => {
       const note = createNote({
@@ -894,8 +1007,12 @@
         ...note,
         parentId: note.parentId || null,
         images: Array.isArray(note.images) ? note.images : [],
+        tags: Array.isArray(note.tags) ? note.tags : [],
+        collapsed: Boolean(note.collapsed),
         history: Array.isArray(note.history) ? note.history : [],
         lastText: note.lastText ?? note.text ?? "",
+        localX: Number.isFinite(note.localX) ? note.localX : 8,
+        localY: Number.isFinite(note.localY) ? note.localY : 8,
         w: note.w || 260,
         h: note.h || 188
       };
@@ -922,8 +1039,12 @@
         title: seed.title || "無題のメモ",
         text: seed.text || "",
         images: [],
+        tags: seed.tags || [],
+        collapsed: false,
         x: seed.x ?? 80,
         y: seed.y ?? 80,
+        localX: seed.localX ?? 8,
+        localY: seed.localY ?? 8,
         w: 260,
         h: 188,
         color: seed.color || palette[0],
@@ -958,8 +1079,8 @@
         parentId: parent.id,
         title: "子メモ",
         text: "",
-        x: parent.x + 28,
-        y: parent.y + 28,
+        localX: 10 + childNotes(parent.id).length * 18,
+        localY: 10 + childNotes(parent.id).length * 18,
         color: parent.color
       });
       selectedId = child.id;
@@ -1034,8 +1155,59 @@
 
     function noteMatchesQuery(note, query) {
       if (!query) return true;
-      if (`${note.title} ${note.text}`.toLowerCase().includes(query)) return true;
+      if (`${note.title} ${note.text} ${note.tags.join(" ")}`.toLowerCase().includes(query)) return true;
       return childNotes(note.id).some(child => noteMatchesQuery(child, query));
+    }
+
+    function parseTags(value) {
+      return String(value || "")
+        .split(/[,\s、，]+/)
+        .map(tag => tag.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    function firstTag(note) {
+      return (note.tags?.[0] || "").toLowerCase();
+    }
+
+    function renderTags(note) {
+      return note.tags.length ? note.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("") : "";
+    }
+
+    function updateTags(note, value) {
+      const nextTags = parseTags(value);
+      if (nextTags.join("\n") === note.tags.join("\n")) return;
+      note.tags = nextTags;
+      note.updatedAt = now();
+      recordEvent(note, "full", "タグ更新", note.tags.join(", "));
+      persist();
+      render();
+    }
+
+    function arrangeNotes(mode) {
+      const sorted = state.notes
+        .filter(note => !note.parentId)
+        .sort((a, b) => {
+          if (mode === "color") return a.color.localeCompare(b.color) || a.title.localeCompare(b.title, "ja");
+          if (mode === "tag") return firstTag(a).localeCompare(firstTag(b), "ja") || a.title.localeCompare(b.title, "ja");
+          if (mode === "updated") return new Date(b.updatedAt) - new Date(a.updatedAt);
+          return 0;
+        });
+
+      const startX = 80;
+      const startY = 72;
+      const gapX = 390;
+      const gapY = 250;
+      const columns = 5;
+      sorted.forEach((note, index) => {
+        note.x = startX + (index % columns) * gapX;
+        note.y = startY + Math.floor(index / columns) * gapY;
+        note.updatedAt = now();
+      });
+      persist();
+      render();
+      toast("メモを整列しました");
     }
 
     function render() {
@@ -1054,7 +1226,7 @@
       notes.forEach(note => {
         const children = childNotes(note.id);
         const card = document.createElement("article");
-        card.className = `note${note.id === selectedId ? " selected" : ""}${note.pinned ? " pinned" : ""}`;
+        card.className = `note${note.id === selectedId ? " selected" : ""}${note.pinned ? " pinned" : ""}${note.collapsed ? " collapsed" : ""}`;
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
         card.style.width = `${note.w || 260}px`;
@@ -1067,9 +1239,10 @@
           </div>
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
           <textarea aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>
-          <div>
+          <div class="note-body">
+            <div class="tag-row">${renderTags(note)}<input class="tag-input" value="${escapeAttr(note.tags.join(", "))}" placeholder="タグ"></div>
             <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
-            <div class="child-notes">${children.map(child => renderChildNote(child)).join("")}</div>
+            <div class="child-notes" style="--child-area-height:${childAreaHeight(children)}px">${children.map(child => renderChildNote(child)).join("")}</div>
             <div class="note-actions">
               <span>
                 <button class="pin" title="ピン留め">${iconPin()}</button>
@@ -1091,6 +1264,10 @@
 
         const head = card.querySelector(".note-head");
         head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
+        card.addEventListener("dblclick", (event) => {
+          if (event.target.closest("button,textarea,.tag-input")) return;
+          toggleCollapsed(note);
+        });
 
         const title = card.querySelector(".note-title");
         title.addEventListener("change", () => {
@@ -1116,6 +1293,8 @@
           persist();
           render();
         });
+
+        wireTagInput(card.querySelector(".tag-input"), note);
 
         card.querySelector(".pin").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1175,9 +1354,13 @@
     function renderChildNote(child) {
       const grandchildren = childNotes(child.id);
       return `
-        <section class="child-note${child.id === selectedId ? " selected" : ""}" data-child-id="${child.id}">
-          <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
+        <section class="child-note${child.id === selectedId ? " selected" : ""}${child.collapsed ? " collapsed" : ""}" data-child-id="${child.id}" style="left:${child.localX || 8}px; top:${child.localY || 8}px; background:${child.color}">
+          <div class="child-head">
+            <button class="child-move" title="親メモ内で移動">${iconMove()}</button>
+            <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
+          </div>
           <textarea class="child-text" aria-label="子メモ本文" placeholder="子メモを書く">${escapeHtml(child.text)}</textarea>
+          <div class="tag-row child-tags">${renderTags(child)}<input class="tag-input child-tag-input" value="${escapeAttr(child.tags.join(", "))}" placeholder="タグ"></div>
           <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件 / 子 ${grandchildren.length} 件</div>
           <div class="child-actions">
             <span>
@@ -1187,7 +1370,7 @@
             </span>
             <button class="child-delete" title="削除">${iconTrash()}</button>
           </div>
-          ${grandchildren.length ? `<div class="child-notes">${grandchildren.map(grandchild => renderChildNote(grandchild)).join("")}</div>` : ""}
+          <div class="child-notes" style="--child-area-height:${childAreaHeight(grandchildren)}px">${grandchildren.map(grandchild => renderChildNote(grandchild)).join("")}</div>
         </section>
       `;
     }
@@ -1203,6 +1386,21 @@
           persist();
           renderSidePanel();
           document.querySelectorAll(".child-note").forEach(item => item.classList.toggle("selected", item.dataset.childId === selectedId));
+        });
+
+        childCard.addEventListener("dblclick", (event) => {
+          if (event.target.closest("button,textarea,.child-tag-input")) return;
+          event.stopPropagation();
+          toggleCollapsed(child);
+        });
+
+        childCard.querySelector(".child-head").addEventListener("pointerdown", (event) => {
+          if (event.target.closest("input")) return;
+          startChildDrag(event, child, childCard);
+        });
+        childCard.querySelector(".child-head").addEventListener("mousedown", (event) => {
+          if (event.target.closest("input")) return;
+          startChildMouseDrag(event, child, childCard);
         });
 
         childCard.querySelector(".child-title").addEventListener("change", (event) => {
@@ -1223,6 +1421,8 @@
           persist();
           render();
         });
+
+        wireTagInput(childCard.querySelector(".child-tag-input"), child);
 
         childCard.querySelector(".child-select").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1262,6 +1462,133 @@
       if (removeIds.has(selectedId)) {
         selectedId = state.notes[0]?.id || null;
       }
+    }
+
+    function wireTagInput(input, note) {
+      const commit = () => updateTags(note, input.value);
+      input.addEventListener("change", commit);
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+          input.blur();
+        }
+      });
+    }
+
+    function childAreaHeight(children) {
+      if (children.length === 0) return 46;
+      const bottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
+      return Math.max(160, bottom + 18);
+    }
+
+    function childVisualHeight(child) {
+      if (child.collapsed) return 54;
+      const nested = childAreaHeight(childNotes(child.id));
+      return 138 + Math.min(260, nested);
+    }
+
+    function toggleCollapsed(note) {
+      note.collapsed = !note.collapsed;
+      note.updatedAt = now();
+      recordEvent(note, "full", note.collapsed ? "タイトル表示に折りたたみ" : "メモを展開", note.title);
+      persist();
+      render();
+    }
+
+    function startChildDrag(event, child, childCard) {
+      event.preventDefault();
+      event.stopPropagation();
+      childCard.setPointerCapture(event.pointerId);
+      childCard.classList.add("dragging");
+      drag = {
+        type: "child",
+        id: child.id,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        noteX: child.localX || 8,
+        noteY: child.localY || 8,
+        moved: false
+      };
+      window.addEventListener("pointermove", onChildDrag);
+      window.addEventListener("pointerup", endChildDrag, { once: true });
+    }
+
+    function startChildMouseDrag(event, child, childCard) {
+      event.preventDefault();
+      event.stopPropagation();
+      childCard.classList.add("dragging");
+      drag = {
+        type: "child-mouse",
+        id: child.id,
+        startX: event.clientX,
+        startY: event.clientY,
+        noteX: child.localX || 8,
+        noteY: child.localY || 8,
+        moved: false
+      };
+      window.addEventListener("mousemove", onChildMouseDrag);
+      window.addEventListener("mouseup", endChildMouseDrag, { once: true });
+    }
+
+    function onChildDrag(event) {
+      if (!drag || drag.type !== "child" || event.pointerId !== drag.pointerId) return;
+      moveChildByClientPosition(event.clientX, event.clientY);
+    }
+
+    function onChildMouseDrag(event) {
+      if (!drag || drag.type !== "child-mouse") return;
+      moveChildByClientPosition(event.clientX, event.clientY);
+    }
+
+    function moveChildByClientPosition(clientX, clientY) {
+      const child = findNote(drag.id);
+      if (!child) return;
+      const childCard = document.querySelector(`.child-note[data-child-id="${child.id}"]`);
+      if (!childCard) return;
+      const container = childCard.parentElement;
+      const maxX = Math.max(0, container.clientWidth - childCard.offsetWidth - 8);
+      child.localX = Math.max(0, Math.min(maxX, drag.noteX + clientX - drag.startX));
+      child.localY = Math.max(0, drag.noteY + clientY - drag.startY);
+      drag.moved = true;
+      childCard.style.left = `${child.localX}px`;
+      childCard.style.top = `${child.localY}px`;
+    }
+
+    function endChildDrag(event) {
+      const card = drag ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`) : null;
+      if (card) card.classList.remove("dragging");
+      window.removeEventListener("pointermove", onChildDrag);
+      if (drag?.moved) {
+        const child = findNote(drag.id);
+        if (child) {
+          child.updatedAt = now();
+          const parent = findNote(child.parentId);
+          if (parent) parent.updatedAt = child.updatedAt;
+          persist();
+          render();
+        }
+      }
+      drag = null;
+    }
+
+    function endChildMouseDrag() {
+      const card = drag ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`) : null;
+      if (card) card.classList.remove("dragging");
+      window.removeEventListener("mousemove", onChildMouseDrag);
+      if (drag?.moved) {
+        const child = findNote(drag.id);
+        if (child) {
+          child.updatedAt = now();
+          const parent = findNote(child.parentId);
+          if (parent) parent.updatedAt = child.updatedAt;
+          persist();
+          render();
+        }
+      }
+      drag = null;
     }
 
     function startDrag(event, note, card) {
@@ -1643,6 +1970,9 @@
     }
     function iconSelect() {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconMove() {
+      return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3 8 7M12 3l4 4M12 21l-4-4M12 21l4-4M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     }
     function iconTrash() {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
