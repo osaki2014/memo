@@ -182,10 +182,7 @@
       perspective: 1100px;
       transform-style: preserve-3d;
       overflow: visible;
-      background:
-        linear-gradient(90deg, rgba(218,220,224,.75) 1px, transparent 1px),
-        linear-gradient(rgba(218,220,224,.75) 1px, transparent 1px);
-      background-size: 56px 56px;
+      background: #fff;
     }
 
     .canvas.tag-3d .note {
@@ -198,9 +195,10 @@
       top: 0;
       width: 100%;
       height: 100%;
-      z-index: 2;
+      z-index: 1;
       display: block;
       background: #ffffff;
+      border-radius: 8px;
     }
 
     .markdown-preview {
@@ -233,17 +231,18 @@
       position: sticky;
       top: 58px;
       left: 10px;
-      z-index: 18;
+      z-index: 24;
       width: fit-content;
       display: flex;
       align-items: center;
       gap: 8px;
       margin: 8px 0;
-      padding: 8px;
-      border: 1px solid rgba(218,220,224,.9);
-      border-radius: 8px;
-      background: rgba(255,255,255,.92);
-      box-shadow: 0 6px 18px rgba(60,64,67,.12);
+      padding: 10px;
+      border: 1px solid rgba(189,193,198,.75);
+      border-radius: 10px;
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 14px 34px rgba(60,64,67,.14);
+      backdrop-filter: blur(8px);
     }
 
     .depth-mode {
@@ -256,32 +255,72 @@
     }
 
     .view-cube {
-      display: grid;
-      grid-template-columns: repeat(3, 28px);
-      grid-template-rows: repeat(3, 28px);
-      gap: 2px;
-      padding: 4px;
-      border-radius: 6px;
-      background: #f1f3f4;
-      box-shadow: inset -3px -3px 0 rgba(60,64,67,.12), inset 3px 3px 0 rgba(255,255,255,.8);
+      position: relative;
+      width: 96px;
+      height: 96px;
+      border-radius: 10px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.96), rgba(241,243,244,.86));
+      box-shadow:
+        inset -4px -4px 0 rgba(60,64,67,.10),
+        inset 4px 4px 0 rgba(255,255,255,.86),
+        0 10px 24px rgba(60,64,67,.12);
+      transform-style: preserve-3d;
     }
 
     .view-cube button {
-      width: 28px;
-      height: 28px;
+      position: absolute;
+      width: 34px;
+      height: 30px;
       min-width: 0;
       padding: 0;
-      border-radius: 4px;
+      border-radius: 5px;
       justify-content: center;
       font-size: 10px;
       font-weight: 760;
-      background: #fff;
+      background: linear-gradient(145deg, #fff, #eef1f4);
+      border: 1px solid rgba(189,193,198,.9);
+      color: #3c4043;
+      box-shadow: 0 2px 5px rgba(60,64,67,.12);
+    }
+
+    .view-cube button[data-view="top"] {
+      left: 31px;
+      top: 8px;
+      transform: skewX(-28deg) scaleY(.86);
+      transform-origin: bottom;
+    }
+
+    .view-cube button[data-view="left"] {
+      left: 10px;
+      top: 38px;
+      transform: skewY(18deg);
+    }
+
+    .view-cube button[data-view="front"] {
+      left: 31px;
+      top: 38px;
+      z-index: 2;
+    }
+
+    .view-cube button[data-view="right"] {
+      right: 10px;
+      top: 38px;
+      transform: skewY(-18deg);
+    }
+
+    .view-cube button[data-view="bottom"] {
+      left: 31px;
+      bottom: 8px;
+      transform: skewX(28deg) scaleY(.86);
+      transform-origin: top;
     }
 
     .view-cube button.active {
-      background: var(--accent);
+      background: linear-gradient(145deg, #5f9bff, #1a73e8);
       color: #fff;
       border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(26,115,232,.28);
     }
 
     .tag-shelf {
@@ -1584,9 +1623,9 @@
       return `
         <div class="tag-3d-controls">
           <div class="view-cube" aria-label="ビューキューブ">
-            <span></span><button data-view="top" class="${active("top")}">上</button><span></span>
+            <button data-view="top" class="${active("top")}">上</button>
             <button data-view="left" class="${active("left")}">左</button><button data-view="front" class="${active("front")}">前</button><button data-view="right" class="${active("right")}">右</button>
-            <span></span><button data-view="bottom" class="${active("bottom")}">下</button><span></span>
+            <button data-view="bottom" class="${active("bottom")}">下</button>
           </div>
         </div>
       `;
@@ -2321,25 +2360,36 @@
       const canvas = document.getElementById("tag3dCanvas");
       if (!canvas) return;
       try {
-        const THREE = await import(new URL("./vendor/three/three.module.js", document.baseURI).href);
+        const THREE = await loadThreeModule();
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(el.canvas.clientWidth, el.canvas.clientHeight, false);
         renderer.setClearColor(0xffffff, 1);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0xffffff, 1400, 2800);
-        const camera = new THREE.PerspectiveCamera(48, el.canvas.clientWidth / el.canvas.clientHeight, 1, 5000);
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = new THREE.Fog(0xffffff, 1900, 4200);
+        const aspect = el.canvas.clientWidth / el.canvas.clientHeight;
+        const viewSize = 1180;
+        const camera = new THREE.OrthographicCamera(
+          -viewSize * aspect / 2,
+          viewSize * aspect / 2,
+          viewSize / 2,
+          -viewSize / 2,
+          -3000,
+          5000
+        );
         setTag3DCamera(camera);
 
-        scene.add(new THREE.HemisphereLight(0xffffff, 0xdadce0, 2.4));
-        const light = new THREE.DirectionalLight(0xffffff, 1.7);
-        light.position.set(260, 520, 420);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xdadce0, 2.2));
+        const light = new THREE.DirectionalLight(0xffffff, 1.9);
+        light.position.set(420, 780, 620);
+        light.castShadow = true;
+        light.shadow.mapSize.width = 2048;
+        light.shadow.mapSize.height = 2048;
         scene.add(light);
-
-        const grid = new THREE.GridHelper(1700, 34, 0xdadce0, 0xe8eaed);
-        grid.position.set(200, -260, 160);
-        scene.add(grid);
 
         const events = get3DBoardEvents(notes);
         const years = events.map(event => new Date(event.at).getFullYear());
@@ -2347,31 +2397,64 @@
         const maxYear = Math.max(...years, minYear);
         const yearRange = Math.max(1, maxYear - minYear);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
+        const categoryGap = 320;
+        const planeWidth = Math.max(1700, categories.length * categoryGap + 700);
+        const planeDepth = 1200;
+        const planeY = -300;
+
+        const plane = new THREE.Mesh(
+          new THREE.PlaneGeometry(planeWidth, planeDepth),
+          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .76, metalness: 0 })
+        );
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.set(0, planeY - 1, 160);
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        const grid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / 48), 0xc9cdd2, 0xe5e7eb);
+        grid.position.set(0, planeY, 160);
+        grid.material.opacity = .9;
+        grid.material.transparent = true;
+        scene.add(grid);
+
+        const fineGrid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / 24), 0xe8eaed, 0xf1f3f4);
+        fineGrid.position.set(0, planeY + .5, 160);
+        fineGrid.material.opacity = .7;
+        fineGrid.material.transparent = true;
+        scene.add(fineGrid);
+
+        const axisMaterial = new THREE.LineBasicMaterial({ color: 0x9aa0a6 });
+        const yAxis = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-planeWidth / 2 + 120, planeY, -420),
+          new THREE.Vector3(-planeWidth / 2 + 120, 420, -420)
+        ]);
+        scene.add(new THREE.Line(yAxis, axisMaterial));
 
         categories.forEach((category, index) => {
-          const x = -560 + index * 300;
+          const x = -((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
           const label = makeLabel(THREE, category, el.classifySelect.value === "tag" ? "タグ" : "色", "");
-          label.position.set(x, 330, -120);
+          label.position.set(x, planeY + 24, -390);
+          label.rotation.x = -Math.PI / 7;
           scene.add(label);
         });
 
         for (let year = minYear; year <= maxYear; year++) {
           const y = -170 + ((year - minYear) / yearRange) * 560;
           const label = makeLabel(THREE, `${year}`, "年", "");
-          label.position.set(-720, y, -180);
+          label.position.set(-planeWidth / 2 + 70, y, -430);
           scene.add(label);
           const lineGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-660, y, -160),
-            new THREE.Vector3(680, y, -160)
+            new THREE.Vector3(-planeWidth / 2 + 130, y, -420),
+            new THREE.Vector3(planeWidth / 2 - 130, y, -420)
           ]);
-          scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xdadce0 })));
+          scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .72 })));
         }
 
         events.forEach((event, index) => {
           const catIndex = Math.max(0, categories.indexOf(event.category));
-          const x = -560 + catIndex * 300;
+          const x = -((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
           const y = -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
-          const z = (index % 9) * 56;
+          const z = -230 + (index % 9) * 70;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
@@ -2385,17 +2468,32 @@
       }
     }
 
+    async function loadThreeModule() {
+      const localUrl = new URL("./vendor/three/three.module.js", document.baseURI).href;
+      try {
+        const response = await fetch(localUrl, { method: "HEAD", cache: "no-store" });
+        if (response.ok) return await import(localUrl);
+      } catch (error) {
+        // CDN fallback below keeps GitHub Pages builds working when vendor files are absent.
+      }
+      return await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+    }
+
     function setTag3DCamera(camera) {
       const positions = {
-        front: [40, 190, 1280],
-        top: [40, 1180, 120],
-        bottom: [40, -820, 940],
-        left: [-1180, 190, 420],
-        right: [1180, 190, 420]
+        front: [760, 720, 1120],
+        top: [0, 1480, 120],
+        bottom: [0, -1260, 720],
+        left: [-1260, 620, 340],
+        right: [1260, 620, 340]
       };
       const [x, y, z] = positions[tag3dView] || positions.front;
       camera.position.set(x, y, z);
-      camera.lookAt(0, 70, 120);
+      camera.lookAt(0, -120, 60);
+      if ("zoom" in camera) {
+        camera.zoom = .82;
+        camera.updateProjectionMatrix();
+      }
     }
 
     function get3DBoardEvents(notes) {
@@ -2440,6 +2538,8 @@
         metalness: .03
       });
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       group.add(mesh);
 
       const label = makeCardTextureLabel(THREE, {
