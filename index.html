@@ -186,36 +186,25 @@
     }
 
     .canvas.tag-3d .note {
-      width: 220px !important;
-      height: 168px !important;
-      min-height: 168px;
-      border-radius: 2px;
-      resize: none;
-      transform-style: preserve-3d;
-      transition: transform .28s ease, left .28s ease, top .28s ease, box-shadow .2s ease;
+      display: none;
     }
 
-    .canvas.tag-3d .note::after {
-      content: "";
+    .tag3d-webgl {
       position: absolute;
-      inset: 8px -10px -10px 8px;
-      border-radius: 2px;
-      background: rgba(32,33,36,.09);
-      transform: translateZ(-20px);
-      z-index: -1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      display: block;
+      background: #111827;
     }
-
-    .canvas.tag-3d.view-front .note { transform: translateZ(var(--z, 0px)); }
-    .canvas.tag-3d.view-top .note { transform: rotateX(62deg) translateZ(var(--z, 0px)); }
-    .canvas.tag-3d.view-bottom .note { transform: rotateX(-62deg) translateZ(var(--z, 0px)); }
-    .canvas.tag-3d.view-left .note { transform: rotateY(-50deg) translateZ(var(--z, 0px)); }
-    .canvas.tag-3d.view-right .note { transform: rotateY(50deg) translateZ(var(--z, 0px)); }
 
     .tag-3d-controls {
       position: sticky;
       top: 58px;
       left: 10px;
-      z-index: 16;
+      z-index: 18;
       width: fit-content;
       display: flex;
       align-items: center;
@@ -1024,6 +1013,7 @@
     let tagDrag = null;
     let imageTargetId = null;
     let threeRuntime = null;
+    let tag3dRuntime = null;
     let tag3dView = "front";
 
     const el = {
@@ -1689,7 +1679,7 @@
 
       el.canvas.className = `canvas${isTag3D ? ` tag-3d view-${tag3dView}` : ""}`;
       el.depthModeSelect.hidden = !isTag3D;
-      el.canvas.innerHTML = renderTagShelf() + (isTag3D ? renderTag3DControls() : "");
+      el.canvas.innerHTML = renderTagShelf() + (isTag3D ? renderTag3DControls() + `<canvas class="tag3d-webgl" id="tag3dCanvas"></canvas>` : "");
       wireTagShelf();
       if (isTag3D) wireTag3DControls();
       notes.forEach(note => {
@@ -1819,6 +1809,11 @@
         el.canvas.appendChild(card);
       });
       wireTagStickers(el.canvas);
+      if (isTag3D) {
+        renderTag3DScene(notes);
+      } else if (tag3dRuntime) {
+        tag3dRuntime = null;
+      }
     }
 
     function renderChildNote(child) {
@@ -2247,6 +2242,131 @@
     function closeImageModal() {
       el.imageModal.classList.remove("open");
       el.imageModalImg.removeAttribute("src");
+    }
+
+    async function renderTag3DScene(notes) {
+      const canvas = document.getElementById("tag3dCanvas");
+      if (!canvas) return;
+      try {
+        const THREE = await import("/vendor/three/three.module.js");
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(el.canvas.clientWidth, el.canvas.clientHeight, false);
+        renderer.setClearColor(0x111827, 1);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x111827, 1000, 2400);
+        const camera = new THREE.PerspectiveCamera(48, el.canvas.clientWidth / el.canvas.clientHeight, 1, 5000);
+        setTag3DCamera(camera);
+
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2.2));
+        const light = new THREE.DirectionalLight(0xffffff, 1.7);
+        light.position.set(260, 520, 420);
+        scene.add(light);
+
+        const grid = new THREE.GridHelper(1450, 24, 0x94a3b8, 0x334155);
+        grid.position.set(420, -190, 120);
+        scene.add(grid);
+
+        const sorted = [...notes].sort((a, b) => firstTag(a).localeCompare(firstTag(b), "ja") || new Date(b.updatedAt) - new Date(a.updatedAt));
+        const tagColumns = new Map();
+        sorted.forEach(note => {
+          const tag = firstTag(note) || "タグなし";
+          if (!tagColumns.has(tag)) tagColumns.set(tag, tagColumns.size);
+          const tagIndex = tagColumns.get(tag);
+          const x = -520 + tagIndex * 310;
+          const z = note.depth || 0;
+          const y = 190 - z * 0.24;
+          const card = makeNote3DCard(THREE, note);
+          card.position.set(x + z * 0.2, y, z);
+          scene.add(card);
+        });
+
+        for (const [tag, index] of tagColumns.entries()) {
+          const label = makeLabel(THREE, tag, "タグ列", "");
+          label.position.set(-520 + index * 310, 270, -40);
+          scene.add(label);
+        }
+
+        renderer.render(scene, camera);
+        tag3dRuntime = { THREE, renderer, scene, camera };
+      } catch (error) {
+        console.error(error);
+        toast("タグ3Dシーンの描画に失敗しました");
+      }
+    }
+
+    function setTag3DCamera(camera) {
+      const positions = {
+        front: [120, 300, 1050],
+        top: [120, 1120, 80],
+        bottom: [120, -760, 720],
+        left: [-1080, 260, 360],
+        right: [1180, 260, 360]
+      };
+      const [x, y, z] = positions[tag3dView] || positions.front;
+      camera.position.set(x, y, z);
+      camera.lookAt(140, 70, 120);
+    }
+
+    function makeNote3DCard(THREE, note) {
+      const group = new THREE.Group();
+      const geometry = new THREE.BoxGeometry(220, 156, 18);
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(note.color || "#fff8c7"),
+        roughness: .62,
+        metalness: .03
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      group.add(mesh);
+
+      const label = makeCardTextureLabel(THREE, note);
+      label.position.set(0, 0, 10);
+      group.add(label);
+
+      return group;
+    }
+
+    function makeCardTextureLabel(THREE, note) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 360;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "rgba(255,255,255,.0)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#202124";
+      ctx.font = "bold 34px system-ui, sans-serif";
+      ctx.fillText(note.title.slice(0, 18), 30, 56);
+      ctx.fillStyle = "#5f6368";
+      ctx.font = "22px system-ui, sans-serif";
+      wrapCanvasText(ctx, note.text || "", 30, 102, 450, 30, 4);
+      ctx.fillStyle = "#174ea6";
+      ctx.font = "bold 20px system-ui, sans-serif";
+      ctx.fillText((note.tags || []).slice(0, 3).join("  "), 30, 318);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(210, 148, 1);
+      return sprite;
+    }
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      const words = String(text).replace(/\n/g, " ").split(/\s+/).filter(Boolean);
+      let line = "";
+      let lines = 0;
+      for (const word of words) {
+        const testLine = line ? `${line} ${word}` : word;
+        if (ctx.measureText(testLine).width > maxWidth && line) {
+          ctx.fillText(line, x, y);
+          y += lineHeight;
+          lines += 1;
+          line = word;
+          if (lines >= maxLines) return;
+        } else {
+          line = testLine;
+        }
+      }
+      if (line && lines < maxLines) ctx.fillText(line, x, y);
     }
 
     async function openTimeline() {
