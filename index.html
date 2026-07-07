@@ -386,7 +386,8 @@
       opacity: .55;
     }
 
-    .note.drop-target {
+    .note.drop-target,
+    .child-note.drop-target {
       outline: 3px solid rgba(26,115,232,.32);
       outline-offset: 3px;
     }
@@ -2155,6 +2156,95 @@
       });
     }
 
+    function adoptNoteIntoParent(child, parent, clientX, clientY) {
+      if (!child || !parent || child.id === parent.id) return false;
+      if (descendantIds(child.id).includes(parent.id)) return false;
+      const parentCard = document.querySelector(`.note[data-id="${parent.id}"], .child-note[data-child-id="${parent.id}"]`);
+      const childArea = parentCard?.querySelector(".child-notes");
+      const areaRect = childArea?.getBoundingClientRect() || parentCard?.getBoundingClientRect();
+      const previousParent = child.parentId ? findNote(child.parentId) : null;
+      const adoptedAt = now();
+      const siblingCount = childNotes(parent.id).filter(note => note.id !== child.id).length;
+      const hasUsableArea = areaRect && areaRect.width > 40 && areaRect.height > 40 && !parent.collapsed;
+      child.parentId = parent.id;
+      child.localX = hasUsableArea ? Math.max(8, Math.min(360, Math.round(clientX - areaRect.left))) : 12 + siblingCount * 18;
+      child.localY = hasUsableArea ? Math.max(8, Math.min(260, Math.round(clientY - areaRect.top))) : 12 + siblingCount * 18;
+      child.color = childColorFromParent(parent.color, siblingCount);
+      child.updatedAt = adoptedAt;
+      parent.collapsed = false;
+      parent.updatedAt = adoptedAt;
+      if (previousParent) previousParent.updatedAt = adoptedAt;
+      recordEvent(child, "full", "親メモへ移動", `${parent.title} の中へ移動`, adoptedAt);
+      recordEvent(parent, "full", "子メモ受け入れ", child.title, adoptedAt);
+      return true;
+    }
+
+    function childColorFromParent(parentColor, index = 0) {
+      const rgb = hexToRgb(parentColor);
+      if (!rgb) return parentColor;
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+      const saturationBump = [.18, .08, .26][index % 3];
+      const lightOffset = [-.045, -.015, -.07][index % 3];
+      return hslToHex({
+        h: hsl.h,
+        s: clamp01(hsl.s + saturationBump),
+        l: clamp01(hsl.l + lightOffset)
+      });
+    }
+
+    function hexToRgb(hex) {
+      const normalized = String(hex || "").replace("#", "").trim();
+      if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
+      const value = Number.parseInt(normalized, 16);
+      return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+    }
+
+    function rgbToHsl(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > .5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+        if (max === g) h = (b - r) / d + 2;
+        if (max === b) h = (r - g) / d + 4;
+        h /= 6;
+      }
+      return { h, s, l };
+    }
+
+    function hslToHex({ h, s, l }) {
+      const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      };
+      let r;
+      let g;
+      let b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const q = l < .5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1 / 3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1 / 3);
+      }
+      return `#${[r, g, b].map(value => Math.round(value * 255).toString(16).padStart(2, "0")).join("")}`;
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
     function childAreaHeight(children) {
       if (children.length === 0) return 46;
       const bottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
@@ -2302,6 +2392,7 @@
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
       }
+      markNoteDropTarget(note.id, event.clientX, event.clientY);
     }
 
     function endDrag(event) {
@@ -2311,10 +2402,20 @@
       if (drag?.moved) {
         const note = findNote(drag.id);
         if (note) {
+          const parent = findDropParentForNote(note.id, event.clientX, event.clientY);
+          if (parent && adoptNoteIntoParent(note, parent, event.clientX, event.clientY)) {
+            clearNoteDropTargets();
+            persist();
+            render();
+            toast(`${note.title} を ${parent.title} の中へ入れました`);
+            drag = null;
+            return;
+          }
           note.updatedAt = now();
           persist();
         }
       }
+      clearNoteDropTargets();
       drag = null;
     }
 
@@ -2349,20 +2450,56 @@
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
       }
+      markNoteDropTarget(note.id, event.clientX, event.clientY);
     }
 
-    function endMouseDrag() {
+    function endMouseDrag(event) {
       const card = drag ? document.querySelector(`.note[data-id="${drag.id}"]`) : null;
       if (card) card.classList.remove("dragging");
       window.removeEventListener("mousemove", onMouseDrag);
       if (drag?.moved) {
         const note = findNote(drag.id);
         if (note) {
+          const parent = findDropParentForNote(note.id, event.clientX, event.clientY);
+          if (parent && adoptNoteIntoParent(note, parent, event.clientX, event.clientY)) {
+            clearNoteDropTargets();
+            persist();
+            render();
+            toast(`${note.title} を ${parent.title} の中へ入れました`);
+            drag = null;
+            return;
+          }
           note.updatedAt = now();
           persist();
         }
       }
+      clearNoteDropTargets();
       drag = null;
+    }
+
+    function markNoteDropTarget(noteId, clientX, clientY) {
+      clearNoteDropTargets();
+      const parent = findDropParentForNote(noteId, clientX, clientY);
+      if (!parent) return;
+      const card = document.querySelector(`.note[data-id="${parent.id}"], .child-note[data-child-id="${parent.id}"]`);
+      card?.classList.add("drop-target");
+    }
+
+    function clearNoteDropTargets() {
+      document.querySelectorAll(".note.drop-target,.child-note.drop-target").forEach(item => item.classList.remove("drop-target"));
+    }
+
+    function findDropParentForNote(noteId, clientX, clientY) {
+      const elements = document.elementsFromPoint(clientX, clientY);
+      const target = elements
+        .map(element => element.closest?.(".note,.child-note"))
+        .find(element => element && element.dataset.id !== noteId && element.dataset.childId !== noteId);
+      if (!target) return null;
+      const parentId = target.dataset.id || target.dataset.childId;
+      const child = findNote(noteId);
+      const parent = findNote(parentId);
+      if (!child || !parent || descendantIds(child.id).includes(parent.id)) return null;
+      return parent;
     }
 
     function startBoardPan(event) {
@@ -2533,6 +2670,7 @@
         const maxYear = Math.max(...years, minYear);
         const yearRange = Math.max(1, maxYear - minYear);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
+        const colorGroups = [...new Set(events.map(event => event.colorName))].sort((a, b) => a.localeCompare(b, "ja"));
         const categoryGap = 320;
         const categoryBaseX = -420;
         const planeWidth = Math.max(1700, categories.length * categoryGap + 700);
@@ -2570,6 +2708,14 @@
           scene.add(label);
         });
 
+        colorGroups.forEach((colorGroup, index) => {
+          const z = colorDepth(colorGroup, colorGroups);
+          const label = makeLabel(THREE, colorGroup, "色奥行き", "");
+          label.position.set(planeWidth / 2 - 210, planeY + 26, z);
+          label.rotation.x = -Math.PI / 7;
+          scene.add(label);
+        });
+
         for (let year = minYear; year <= maxYear; year++) {
           const y = minYear === maxYear ? 80 : -170 + ((year - minYear) / yearRange) * 560;
           const label = makeLabel(THREE, `${year}`, "年", "");
@@ -2586,7 +2732,7 @@
           const catIndex = Math.max(0, categories.indexOf(event.category));
           const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
           const y = minYear === maxYear ? 80 : -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
-          const z = -120 + (index % 9) * 76;
+          const z = colorDepth(event.colorName, colorGroups) + (index % 4) * 18;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
@@ -2666,9 +2812,15 @@
             noteTitle: note.title,
             category,
             color: note.color,
+            colorName: colorName(note.color),
             preview: event.value || note.text
           }));
       }).sort((a, b) => new Date(b.at) - new Date(a.at));
+    }
+
+    function colorDepth(color, colorGroups) {
+      const index = Math.max(0, colorGroups.indexOf(color));
+      return -360 + index * 120;
     }
 
     function colorName(color) {
