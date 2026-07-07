@@ -406,6 +406,11 @@
       gap: 8px;
       resize: both;
       overflow: hidden;
+      cursor: default;
+    }
+
+    .note.edge-drag {
+      cursor: grab;
     }
 
     .note.collapsed {
@@ -425,6 +430,11 @@
       border-color: var(--accent);
       box-shadow: var(--shadow);
       z-index: 8;
+    }
+
+    .note.dragging {
+      z-index: 20;
+      opacity: .96;
     }
 
     .note.pinned::before {
@@ -741,6 +751,12 @@
       border-radius: 8px;
       background: #fff;
       padding: 10px;
+    }
+
+    .event.selected-event {
+      border-color: var(--accent);
+      background: #f8fbff;
+      box-shadow: 0 0 0 3px rgba(26,115,232,.14);
     }
 
     .event-top {
@@ -1116,6 +1132,7 @@
     let boardMode = "2d";
     let markdownPreview = false;
     let lastTag3DClick = null;
+    let boardZoom = 1;
 
     const el = {
       app: document.getElementById("app"),
@@ -1176,6 +1193,7 @@
     });
 
     el.boardScroll.addEventListener("pointerdown", startBoardPan);
+    el.boardScroll.addEventListener("wheel", zoomBoardAtPointer, { passive: false });
 
     el.markdownToggle.addEventListener("click", () => {
       markdownPreview = !markdownPreview;
@@ -1844,6 +1862,7 @@
     function renderNotes() {
       const query = el.searchInput.value.trim().toLowerCase();
       const isTag3D = boardMode === "3d";
+      if (!isTag3D) resolveRootOverlaps(null, 1);
       const notes = [...state.notes]
         .filter(note => !note.parentId)
         .sort((a, b) => {
@@ -1853,6 +1872,8 @@
         .filter(note => noteMatchesQuery(note, query));
 
       el.canvas.className = `canvas${isTag3D ? ` tag-3d view-${tag3dView}` : ""}`;
+      el.canvas.style.transform = isTag3D ? "" : `scale(${boardZoom})`;
+      el.canvas.style.transformOrigin = "0 0";
       el.canvas.innerHTML = renderTagShelf() + (isTag3D ? renderTag3DControls() + `<canvas class="tag3d-webgl" id="tag3dCanvas"></canvas>` : "");
       wireTagShelf();
       if (isTag3D) wireTag3DControls();
@@ -1891,11 +1912,19 @@
         `;
 
         card.addEventListener("pointerdown", (event) => {
+          if (event.target === card || isNoteEdgePointer(event, card)) {
+            startDrag(event, note, card);
+            return;
+          }
           selectedId = note.id;
           persist();
           renderSidePanel();
           document.querySelectorAll(".note").forEach(n => n.classList.toggle("selected", n.dataset.id === selectedId));
         });
+        card.addEventListener("mousemove", (event) => {
+          card.classList.toggle("edge-drag", isNoteEdgePointer(event, card));
+        });
+        card.addEventListener("mouseleave", () => card.classList.remove("edge-drag"));
 
         const head = card.querySelector(".note-head");
         head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
@@ -1963,10 +1992,11 @@
         card.addEventListener("mouseup", () => {
           const rect = card.getBoundingClientRect();
           const canvasRect = el.canvas.getBoundingClientRect();
-          note.w = Math.round(rect.width);
-          note.h = Math.round(rect.height);
-          note.x = Math.round(rect.left - canvasRect.left + el.canvas.scrollLeft);
-          note.y = Math.round(rect.top - canvasRect.top + el.canvas.scrollTop);
+          note.w = Math.round(rect.width / boardZoom);
+          note.h = Math.round(rect.height / boardZoom);
+          note.x = Math.round((rect.left - canvasRect.left) / boardZoom);
+          note.y = Math.round((rect.top - canvasRect.top) / boardZoom);
+          resolveRootOverlaps(null, 1);
           persist();
         });
 
@@ -2360,7 +2390,7 @@
     }
 
     function startDrag(event, note, card) {
-      if (!event.target.closest(".note-move") && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      if (!event.target.closest(".note-move") && !isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       if (drag?.type === "note-mouse") return;
       event.preventDefault();
       event.stopPropagation();
@@ -2384,14 +2414,16 @@
       if (!drag || event.pointerId !== drag.pointerId) return;
       const note = findNote(drag.id);
       if (!note) return;
-      note.x = Math.max(0, drag.noteX + event.clientX - drag.startX);
-      note.y = Math.max(0, drag.noteY + event.clientY - drag.startY);
+      note.x = Math.max(0, drag.noteX + (event.clientX - drag.startX) / boardZoom);
+      note.y = Math.max(0, drag.noteY + (event.clientY - drag.startY) / boardZoom);
       drag.moved = true;
       const card = document.querySelector(`.note[data-id="${note.id}"]`);
       if (card) {
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
       }
+      resolveRootOverlaps(note.id, .18);
+      syncRootNotePositions();
       markNoteDropTarget(note.id, event.clientX, event.clientY);
     }
 
@@ -2402,7 +2434,7 @@
       if (drag?.moved) {
         const note = findNote(drag.id);
         if (note) {
-          const parent = findDropParentForNote(note.id, event.clientX, event.clientY);
+          const parent = findIntrudingParent(note.id) || findDropParentForNote(note.id, event.clientX, event.clientY);
           if (parent && adoptNoteIntoParent(note, parent, event.clientX, event.clientY)) {
             clearNoteDropTargets();
             persist();
@@ -2411,6 +2443,7 @@
             drag = null;
             return;
           }
+          resolveRootOverlaps(null, 1);
           note.updatedAt = now();
           persist();
         }
@@ -2421,7 +2454,7 @@
 
     function startMouseDrag(event, note, card) {
       if (event.button !== 0) return;
-      if (!event.target.closest(".note-move") && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      if (!event.target.closest(".note-move") && !isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       event.preventDefault();
       event.stopPropagation();
       card.classList.add("dragging");
@@ -2442,14 +2475,16 @@
       if (!drag || drag.type !== "note-mouse") return;
       const note = findNote(drag.id);
       if (!note) return;
-      note.x = Math.max(0, drag.noteX + event.clientX - drag.startX);
-      note.y = Math.max(0, drag.noteY + event.clientY - drag.startY);
+      note.x = Math.max(0, drag.noteX + (event.clientX - drag.startX) / boardZoom);
+      note.y = Math.max(0, drag.noteY + (event.clientY - drag.startY) / boardZoom);
       drag.moved = true;
       const card = document.querySelector(`.note[data-id="${note.id}"]`);
       if (card) {
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
       }
+      resolveRootOverlaps(note.id, .18);
+      syncRootNotePositions();
       markNoteDropTarget(note.id, event.clientX, event.clientY);
     }
 
@@ -2460,7 +2495,7 @@
       if (drag?.moved) {
         const note = findNote(drag.id);
         if (note) {
-          const parent = findDropParentForNote(note.id, event.clientX, event.clientY);
+          const parent = findIntrudingParent(note.id) || findDropParentForNote(note.id, event.clientX, event.clientY);
           if (parent && adoptNoteIntoParent(note, parent, event.clientX, event.clientY)) {
             clearNoteDropTargets();
             persist();
@@ -2469,6 +2504,7 @@
             drag = null;
             return;
           }
+          resolveRootOverlaps(null, 1);
           note.updatedAt = now();
           persist();
         }
@@ -2479,7 +2515,7 @@
 
     function markNoteDropTarget(noteId, clientX, clientY) {
       clearNoteDropTargets();
-      const parent = findDropParentForNote(noteId, clientX, clientY);
+      const parent = findIntrudingParent(noteId) || findDropParentForNote(noteId, clientX, clientY);
       if (!parent) return;
       const card = document.querySelector(`.note[data-id="${parent.id}"], .child-note[data-child-id="${parent.id}"]`);
       card?.classList.add("drop-target");
@@ -2500,6 +2536,115 @@
       const parent = findNote(parentId);
       if (!child || !parent || descendantIds(child.id).includes(parent.id)) return null;
       return parent;
+    }
+
+    function isNoteEdgePointer(event, card) {
+      if (!card || !event) return false;
+      const rect = card.getBoundingClientRect();
+      const edge = 14;
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      return x <= edge || y <= edge || rect.width - x <= edge || rect.height - y <= edge;
+    }
+
+    function noteRect(note) {
+      return {
+        left: note.x || 0,
+        top: note.y || 0,
+        right: (note.x || 0) + (note.w || 260),
+        bottom: (note.y || 0) + (note.h || 188),
+        width: note.w || 260,
+        height: note.h || 188
+      };
+    }
+
+    function overlapRect(a, b) {
+      const left = Math.max(a.left, b.left);
+      const top = Math.max(a.top, b.top);
+      const right = Math.min(a.right, b.right);
+      const bottom = Math.min(a.bottom, b.bottom);
+      if (right <= left || bottom <= top) return null;
+      return { left, top, right, bottom, width: right - left, height: bottom - top, area: (right - left) * (bottom - top) };
+    }
+
+    function findIntrudingParent(noteId) {
+      const child = findNote(noteId);
+      if (!child || child.parentId) return null;
+      const childRect = noteRect(child);
+      const childArea = childRect.width * childRect.height;
+      let best = null;
+      for (const parent of state.notes.filter(note => !note.parentId && note.id !== noteId)) {
+        const overlap = overlapRect(childRect, noteRect(parent));
+        if (!overlap) continue;
+        const ratio = overlap.area / childArea;
+        if (ratio > .34 && (!best || ratio > best.ratio)) best = { parent, ratio };
+      }
+      return best?.parent || null;
+    }
+
+    function resolveRootOverlaps(excludeId = null, strength = 1) {
+      if (boardMode === "3d") return;
+      const roots = state.notes.filter(note => !note.parentId);
+      const gap = 24;
+      for (let pass = 0; pass < 5; pass++) {
+        let moved = false;
+        for (let i = 0; i < roots.length; i++) {
+          for (let j = i + 1; j < roots.length; j++) {
+            const a = roots[i];
+            const b = roots[j];
+            const overlap = overlapRect(noteRect(a), noteRect(b));
+            if (!overlap) continue;
+            const pushX = overlap.width + gap;
+            const pushY = overlap.height + gap;
+            const movableA = a.id !== excludeId;
+            const movableB = b.id !== excludeId;
+            if (!movableA && !movableB) continue;
+            const dx = ((a.x || 0) + (a.w || 260) / 2) <= ((b.x || 0) + (b.w || 260) / 2) ? -1 : 1;
+            const dy = ((a.y || 0) + (a.h || 188) / 2) <= ((b.y || 0) + (b.h || 188) / 2) ? -1 : 1;
+            const useX = pushX < pushY;
+            const amount = Math.max(6, (useX ? pushX : pushY) * strength);
+            const split = movableA && movableB ? .5 : 1;
+            if (movableA) {
+              if (useX) a.x = Math.max(0, (a.x || 0) + dx * amount * split);
+              else a.y = Math.max(0, (a.y || 0) + dy * amount * split);
+              moved = true;
+            }
+            if (movableB) {
+              if (useX) b.x = Math.max(0, (b.x || 0) - dx * amount * split);
+              else b.y = Math.max(0, (b.y || 0) - dy * amount * split);
+              moved = true;
+            }
+          }
+        }
+        if (!moved) break;
+      }
+    }
+
+    function syncRootNotePositions() {
+      state.notes.filter(note => !note.parentId).forEach(note => {
+        const card = document.querySelector(`.note[data-id="${note.id}"]`);
+        if (!card) return;
+        card.style.left = `${note.x}px`;
+        card.style.top = `${note.y}px`;
+      });
+    }
+
+    function zoomBoardAtPointer(event) {
+      if (boardMode === "3d" || event.target.closest("input,textarea,button,select")) return;
+      event.preventDefault();
+      const previous = boardZoom;
+      const next = Math.max(.45, Math.min(2.4, previous * (event.deltaY < 0 ? 1.1 : .9)));
+      if (Math.abs(next - previous) < .001) return;
+      const rect = el.boardScroll.getBoundingClientRect();
+      const x = event.clientX - rect.left + el.boardScroll.scrollLeft;
+      const y = event.clientY - rect.top + el.boardScroll.scrollTop;
+      const worldX = x / previous;
+      const worldY = y / previous;
+      boardZoom = next;
+      el.canvas.style.transform = `scale(${boardZoom})`;
+      el.canvas.style.transformOrigin = "0 0";
+      el.boardScroll.scrollLeft = worldX * next - (event.clientX - rect.left);
+      el.boardScroll.scrollTop = worldY * next - (event.clientY - rect.top);
     }
 
     function startBoardPan(event) {
@@ -2551,7 +2696,7 @@
       }
 
       el.historyList.innerHTML = events.map(event => `
-        <div class="event">
+        <div class="event${event.noteId === selectedId ? " selected-event" : ""}" data-history-note="${event.noteId || ""}">
           <div class="event-top">
             <span class="pill ${event.type}">${typeLabel[event.type] || event.type}</span>
             <span>${formatDateTime(event.at)}</span>
@@ -2560,6 +2705,8 @@
           <div class="event-body">${escapeHtml(event.label)}${event.value ? "\\n" + escapeHtml(event.value) : ""}</div>
         </div>
       `).join("");
+      const selectedEvent = el.historyList.querySelector(".selected-event");
+      selectedEvent?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
 
     function getVisibleEvents() {
@@ -2567,7 +2714,7 @@
       const source = historyMode === "all"
         ? state.notes
         : state.notes.filter(note => note.id === selectedId || descendantIds(selectedId).includes(note.id));
-      return source.flatMap(note => note.history.map(event => ({ ...event, noteTitle: note.title })))
+      return source.flatMap(note => note.history.map(event => ({ ...event, noteId: note.id, noteTitle: note.title })))
         .sort((a, b) => new Date(b.at) - new Date(a.at));
     }
 
@@ -2665,10 +2812,14 @@
 
         const events = get3DBoardEvents(notes);
         const selectable = [];
-        const years = events.map(event => new Date(event.at).getFullYear());
-        const minYear = Math.min(...years, new Date().getFullYear());
-        const maxYear = Math.max(...years, minYear);
-        const yearRange = Math.max(1, maxYear - minYear);
+        const times = events.map(event => new Date(event.at).getTime()).filter(Number.isFinite);
+        const nowTime = Date.now();
+        const minTime = Math.min(...times, nowTime);
+        const maxTime = Math.max(...times, minTime + 1);
+        const timeRange = Math.max(1, maxTime - minTime);
+        const timeAxisMinY = -180;
+        const timeAxisMaxY = 420;
+        const yForTime = (time) => timeAxisMinY + ((time - minTime) / timeRange) * (timeAxisMaxY - timeAxisMinY);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
         const colorGroups = [...new Set(events.map(event => event.colorName))].sort((a, b) => a.localeCompare(b, "ja"));
         const categoryGap = 320;
@@ -2695,10 +2846,13 @@
 
         const axisMaterial = new THREE.LineBasicMaterial({ color: 0x9aa0a6 });
         const yAxis = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-planeWidth / 2 + 120, planeY, -420),
-          new THREE.Vector3(-planeWidth / 2 + 120, 420, -420)
+          new THREE.Vector3(-planeWidth / 2 + 120, timeAxisMinY, -420),
+          new THREE.Vector3(-planeWidth / 2 + 120, timeAxisMaxY, -420)
         ]);
         scene.add(new THREE.Line(yAxis, axisMaterial));
+        const axisTitle = makeLabel(THREE, "時間", "軸", "");
+        axisTitle.position.set(-planeWidth / 2 + 64, timeAxisMaxY + 46, -420);
+        scene.add(axisTitle);
 
         categories.forEach((category, index) => {
           const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
@@ -2716,22 +2870,22 @@
           scene.add(label);
         });
 
-        for (let year = minYear; year <= maxYear; year++) {
-          const y = minYear === maxYear ? 80 : -170 + ((year - minYear) / yearRange) * 560;
-          const label = makeLabel(THREE, `${year}`, "年", "");
+        buildTimeTicks(minTime, maxTime, 6).forEach(tick => {
+          const y = yForTime(tick);
+          const label = makeLabel(THREE, formatAxisTime(tick), "時刻", "");
           label.position.set(-planeWidth / 2 + 70, y, -430);
           scene.add(label);
           const tickGeo = new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(-planeWidth / 2 + 105, y, -420),
-            new THREE.Vector3(-planeWidth / 2 + 145, y, -420)
+            new THREE.Vector3(planeWidth / 2 - 120, y, -420)
           ]);
-          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .9 })));
-        }
+          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .62 })));
+        });
 
         events.forEach((event, index) => {
           const catIndex = Math.max(0, categories.indexOf(event.category));
           const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
-          const y = minYear === maxYear ? 80 : -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
+          const y = yForTime(new Date(event.at).getTime());
           const z = colorDepth(event.colorName, colorGroups) + (index % 4) * 18;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
@@ -2823,6 +2977,24 @@
       return -360 + index * 120;
     }
 
+    function buildTimeTicks(minTime, maxTime, count = 6) {
+      if (maxTime <= minTime) return [minTime];
+      const ticks = [];
+      const steps = Math.max(1, count - 1);
+      for (let index = 0; index <= steps; index++) {
+        ticks.push(minTime + ((maxTime - minTime) * index) / steps);
+      }
+      return ticks;
+    }
+
+    function formatAxisTime(time) {
+      const date = new Date(time);
+      const sameDay = new Date(time).toDateString() === new Date().toDateString();
+      const datePart = `${date.getMonth() + 1}/${date.getDate()}`;
+      const timePart = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+      return sameDay ? timePart : `${datePart} ${timePart}`;
+    }
+
     function colorName(color) {
       const entries = [
         ["#fff8c7", "黄"],
@@ -2855,8 +3027,7 @@
         text: `${formatDate(event.at)} ${event.preview || ""}`,
         tags: [event.category]
       });
-      label.position.set(0, 0, 8);
-      label.scale.set(230, 92, 1);
+      label.position.set(0, 0, 8.4);
       group.add(label);
 
       group.userData.event = event;
@@ -2946,6 +3117,11 @@
       runtime.selectedObject = card;
       selectedId = card.userData.event.noteId;
       runtime.renderer.domElement.dataset.selected3d = selectedId;
+      historyMode = "selected";
+      el.app.classList.remove("side-collapsed");
+      el.tabSelected.classList.add("active");
+      el.tabAll.classList.remove("active");
+      el.tabTree.classList.remove("active");
       persist();
       setTag3DCardHighlight(card, true);
       renderSidePanel();
@@ -2979,10 +3155,10 @@
       ctx.font = "bold 20px system-ui, sans-serif";
       ctx.fillText((note.tags || []).slice(0, 3).join("  "), 30, 318);
       const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-      const sprite = new THREE.Sprite(material);
-      sprite.scale.set(182, 70, 1);
-      return sprite;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(226, 96), material);
+      return mesh;
     }
 
     function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
