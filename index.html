@@ -208,7 +208,8 @@
 
     .markdown-preview {
       width: 100%;
-      min-height: 86px;
+      min-height: 56px;
+      max-height: 128px;
       color: var(--ink);
       line-height: 1.22;
       font-size: 12px;
@@ -402,7 +403,7 @@
       box-shadow: 0 3px 8px rgba(60,64,67,.18);
       border: 2px solid transparent;
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
       gap: 8px;
       resize: both;
       overflow: hidden;
@@ -532,7 +533,8 @@
 
     .note textarea {
       width: 100%;
-      min-height: 86px;
+      min-height: 56px;
+      max-height: 128px;
       border: 0;
       outline: none;
       resize: none;
@@ -540,6 +542,15 @@
       color: var(--ink);
       line-height: 1.22;
       font-size: 12px;
+      overflow: auto;
+    }
+
+    .note-body {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto minmax(38px, 1fr) auto;
+      gap: 6px;
+      overflow: hidden;
     }
 
     .note-images {
@@ -642,9 +653,18 @@
 
     .child-note textarea {
       min-height: 34px;
+      max-height: 72px;
       font-size: 11px;
       line-height: 1.2;
-      resize: vertical;
+      resize: none;
+      overflow: auto;
+    }
+
+    .child-note .markdown-preview {
+      min-height: 34px;
+      max-height: 72px;
+      font-size: 11px;
+      line-height: 1.2;
     }
 
     .child-meta {
@@ -658,6 +678,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 6px;
+      min-height: 28px;
+    }
+
+    .note > .note-body > .child-notes {
+      height: auto;
+      min-height: 38px;
     }
 
     .child-actions button {
@@ -674,6 +700,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 6px;
+      min-height: 28px;
     }
 
     .note-actions button {
@@ -1862,6 +1889,7 @@
     function renderNotes() {
       const query = el.searchInput.value.trim().toLowerCase();
       const isTag3D = boardMode === "3d";
+      harmonizeChildColors();
       if (!isTag3D) resolveRootOverlaps(null, 1);
       const notes = [...state.notes]
         .filter(note => !note.parentId)
@@ -2220,6 +2248,28 @@
         s: clamp01(hsl.s + saturationBump),
         l: clamp01(hsl.l + lightOffset)
       });
+    }
+
+    function harmonizeChildColors() {
+      let changed = false;
+      state.notes.forEach(note => {
+        if (!note.parentId) return;
+        const parent = findNote(note.parentId);
+        if (!parent) return;
+        const siblings = childNotes(parent.id);
+        const expected = childColorFromParent(parent.color, Math.max(0, siblings.findIndex(child => child.id === note.id)));
+        if (colorName(note.color) !== colorName(parent.color)) {
+          note.color = expected;
+          changed = true;
+        }
+      });
+      if (changed) persist();
+    }
+
+    function effectiveNoteColor(note) {
+      if (!note?.parentId) return note?.color || palette[0];
+      const parent = findNote(note.parentId);
+      return parent?.color || note.color || palette[0];
     }
 
     function hexToRgb(hex) {
@@ -2953,7 +3003,8 @@
     function get3DBoardEvents(notes) {
       const granularity = el.granularitySelect.value;
       return notes.flatMap(note => {
-        const category = el.classifySelect.value === "tag" ? (firstTag(note) || "タグなし") : colorName(note.color);
+        const effectiveColor = effectiveNoteColor(note);
+        const category = el.classifySelect.value === "tag" ? (firstTag(note) || "タグなし") : colorName(effectiveColor);
         return note.history
           .filter(event => {
             if (granularity === "all") return true;
@@ -2966,7 +3017,7 @@
             noteTitle: note.title,
             category,
             color: note.color,
-            colorName: colorName(note.color),
+            colorName: colorName(effectiveColor),
             preview: event.value || note.text
           }));
       }).sort((a, b) => new Date(b.at) - new Date(a.at));
@@ -3005,12 +3056,29 @@
         ["#ffe3c2", "橙"],
         ["#dff3ec", "青緑"]
       ];
-      return entries.find(([value]) => value.toLowerCase() === String(color).toLowerCase())?.[1] || "その他";
+      const exact = entries.find(([value]) => value.toLowerCase() === String(color).toLowerCase());
+      if (exact) return exact[1];
+      const rgb = hexToRgb(color);
+      if (!rgb) return "その他";
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+      let best = entries[0];
+      let bestDistance = Infinity;
+      entries.forEach(entry => {
+        const base = hexToRgb(entry[0]);
+        const baseHsl = rgbToHsl(base.r, base.g, base.b);
+        const hueDistance = Math.min(Math.abs(hsl.h - baseHsl.h), 1 - Math.abs(hsl.h - baseHsl.h));
+        const distance = hueDistance * 3 + Math.abs(hsl.l - baseHsl.l) + Math.abs(hsl.s - baseHsl.s) * .45;
+        if (distance < bestDistance) {
+          best = entry;
+          bestDistance = distance;
+        }
+      });
+      return best[1];
     }
 
     function makeEvent3DCard(THREE, event) {
       const group = new THREE.Group();
-      const geometry = new THREE.BoxGeometry(240, 104, 16);
+      const geometry = new THREE.BoxGeometry(240, 16, 104);
       const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(event.color || "#fff8c7"),
         roughness: .58,
@@ -3027,7 +3095,8 @@
         text: `${formatDate(event.at)} ${event.preview || ""}`,
         tags: [event.category]
       });
-      label.position.set(0, 0, 8.4);
+      label.rotation.x = -Math.PI / 2;
+      label.position.set(0, 8.5, 0);
       group.add(label);
 
       group.userData.event = event;
@@ -3157,7 +3226,7 @@
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(226, 96), material);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(226, 92), material);
       return mesh;
     }
 
