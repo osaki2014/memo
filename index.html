@@ -1,0 +1,1652 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chrono Keep Board</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #dadce0;
+      --paper: #fff8c7;
+      --panel: #ffffff;
+      --bg: #f6f7f2;
+      --accent: #1a73e8;
+      --accent-2: #0b8043;
+      --warn: #fbbc04;
+      --rose: #d93025;
+      --shadow: 0 12px 28px rgba(60, 64, 67, .16);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(255,255,255,.68), rgba(255,255,255,.68)),
+        radial-gradient(circle at 30px 30px, rgba(32,33,36,.07) 1px, transparent 1.5px);
+      background-size: auto, 22px 22px;
+      color: var(--ink);
+      overflow: hidden;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      height: 38px;
+      border-radius: 19px;
+      padding: 0 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+      white-space: nowrap;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(60,64,67,.16); }
+    button:active { transform: translateY(0); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.icon { width: 38px; padding: 0; justify-content: center; }
+    button.active { border-color: var(--accent); background: #e8f0fe; color: #174ea6; }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 58px 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.9);
+      backdrop-filter: blur(12px);
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 210px;
+      font-weight: 720;
+      font-size: 18px;
+    }
+
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #fdd663, #34a853);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+    }
+
+    .search {
+      flex: 1;
+      max-width: 620px;
+      position: relative;
+    }
+
+    .search input {
+      width: 100%;
+      height: 40px;
+      border: 1px solid transparent;
+      border-radius: 20px;
+      background: #f1f3f4;
+      padding: 0 16px 0 42px;
+      outline: none;
+    }
+
+    .search svg {
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      color: var(--muted);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+    }
+
+    .board-shell {
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .board {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+      padding: 28px;
+    }
+
+    .canvas {
+      position: relative;
+      width: 2100px;
+      height: 1280px;
+      background:
+        linear-gradient(90deg, rgba(218,220,224,.55) 1px, transparent 1px),
+        linear-gradient(rgba(218,220,224,.55) 1px, transparent 1px);
+      background-size: 44px 44px;
+      border: 1px solid rgba(218,220,224,.8);
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+    }
+
+    .note {
+      position: absolute;
+      width: 260px;
+      min-height: 188px;
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--paper);
+      box-shadow: 0 3px 8px rgba(60,64,67,.18);
+      border: 2px solid transparent;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 8px;
+      resize: both;
+      overflow: hidden;
+    }
+
+    .note.selected {
+      border-color: var(--accent);
+      box-shadow: var(--shadow);
+      z-index: 8;
+    }
+
+    .note.pinned::before {
+      content: "";
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--rose);
+      box-shadow: 0 0 0 2px rgba(255,255,255,.65);
+    }
+
+    .note-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: grab;
+      min-height: 26px;
+      padding-right: 18px;
+    }
+
+    .note-title {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      font-weight: 760;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .note-meta {
+      color: rgba(32,33,36,.65);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .note textarea {
+      width: 100%;
+      min-height: 86px;
+      border: 0;
+      outline: none;
+      resize: none;
+      background: transparent;
+      color: var(--ink);
+      line-height: 1.45;
+    }
+
+    .note-images {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      max-height: 128px;
+      overflow: auto;
+    }
+
+    .note-images img {
+      width: 100%;
+      height: 74px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: #fff;
+    }
+
+    .child-notes {
+      display: grid;
+      gap: 7px;
+      margin: 4px 0 8px;
+      max-height: 170px;
+      overflow: auto;
+    }
+
+    .child-note {
+      border: 1px solid rgba(60,64,67,.18);
+      border-left: 4px solid var(--accent-2);
+      border-radius: 7px;
+      background: rgba(255,255,255,.58);
+      padding: 7px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .child-note.selected {
+      outline: 2px solid var(--accent);
+      background: rgba(232,240,254,.86);
+    }
+
+    .child-note input,
+    .child-note textarea {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      outline: none;
+      color: var(--ink);
+    }
+
+    .child-note input {
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .child-note textarea {
+      min-height: 34px;
+      font-size: 12px;
+      line-height: 1.35;
+      resize: vertical;
+    }
+
+    .child-meta {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.3;
+    }
+
+    .child-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .child-actions button {
+      height: 26px;
+      width: 26px;
+      border-radius: 13px;
+      padding: 0;
+      justify-content: center;
+      background: rgba(255,255,255,.75);
+    }
+
+    .note-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .note-actions button {
+      height: 30px;
+      width: 30px;
+      border-radius: 15px;
+      padding: 0;
+      justify-content: center;
+      background: rgba(255,255,255,.72);
+    }
+
+    .side {
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: rgba(255,255,255,.92);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .side-head {
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .side-head h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .side-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px 18px 0;
+    }
+
+    .tabs button {
+      flex: 1;
+      justify-content: center;
+      height: 34px;
+      border-radius: 17px;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: auto;
+      padding: 16px 18px 20px;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .event {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .event-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 720;
+      background: #f1f3f4;
+      color: #3c4043;
+    }
+
+    .pill.full { background: #e8f0fe; color: #174ea6; }
+    .pill.paragraph { background: #e6f4ea; color: #137333; }
+    .pill.word { background: #fef7e0; color: #b06000; }
+    .pill.create { background: #fce8e6; color: #a50e0e; }
+
+    .event-note {
+      font-weight: 720;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .event-body {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 88px;
+      overflow: auto;
+    }
+
+    .tree-list {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .tree-item {
+      border-left: 2px solid var(--line);
+      padding: 7px 0 7px 12px;
+      background: linear-gradient(90deg, rgba(241,243,244,.72), transparent);
+    }
+
+    .tree-title {
+      font-weight: 760;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+
+    .tree-note-link {
+      height: auto;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--ink);
+      justify-content: start;
+      text-align: left;
+      white-space: normal;
+    }
+
+    .tree-note-link:hover {
+      transform: none;
+      box-shadow: none;
+      color: var(--accent);
+    }
+
+    .tree-text {
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .tree-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 5px;
+    }
+
+    .tree-image-link {
+      height: 26px;
+      border: 0;
+      border-radius: 13px;
+      padding: 0 9px;
+      background: #e8f0fe;
+      color: #174ea6;
+      box-shadow: none;
+      font-size: 12px;
+      text-decoration: underline;
+    }
+
+    .timeline {
+      position: fixed;
+      inset: 58px 0 0 0;
+      background: #111827;
+      z-index: 40;
+      display: none;
+      grid-template-rows: 54px 1fr;
+      color: #fff;
+    }
+
+    .timeline.open { display: grid; }
+
+    .timeline-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.14);
+      background: rgba(17,24,39,.92);
+    }
+
+    .timeline-bar h2 {
+      margin: 0;
+      font-size: 17px;
+      min-width: 210px;
+    }
+
+    .timeline-bar button, .timeline-bar select {
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      border-color: rgba(255,255,255,.22);
+    }
+
+    .timeline-bar select {
+      height: 38px;
+      border-radius: 19px;
+      padding: 0 12px;
+      outline: none;
+    }
+
+    .timeline-help {
+      margin-left: auto;
+      color: rgba(255,255,255,.7);
+      font-size: 12px;
+    }
+
+    #timeline3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .empty {
+      color: var(--muted);
+      line-height: 1.55;
+      padding: 18px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.65);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      background: #202124;
+      color: #fff;
+      border-radius: 20px;
+      padding: 10px 16px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+      z-index: 70;
+      font-size: 13px;
+    }
+
+    .toast.show { opacity: 1; }
+
+    .hidden-file { display: none; }
+
+    .image-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      place-items: center;
+      padding: 22px;
+      background: rgba(17,24,39,.72);
+    }
+
+    .image-modal.open { display: grid; }
+
+    .image-dialog {
+      width: min(960px, 94vw);
+      max-height: 90vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .image-dialog-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 720;
+    }
+
+    .image-dialog img {
+      display: block;
+      width: 100%;
+      max-height: calc(90vh - 60px);
+      object-fit: contain;
+      background: #111827;
+    }
+
+    @media (max-width: 920px) {
+      body { overflow: auto; }
+      .app { height: auto; min-height: 100vh; grid-template-rows: auto 1fr; }
+      .topbar { flex-wrap: wrap; }
+      .brand { min-width: 0; width: 100%; }
+      .search { order: 3; max-width: none; width: 100%; flex-basis: 100%; }
+      .main { grid-template-columns: 1fr; }
+      .board-shell { min-height: 68vh; }
+      .side { border-left: 0; border-top: 1px solid var(--line); min-height: 420px; }
+      .timeline { inset: 0; }
+      .timeline-bar { flex-wrap: wrap; height: auto; align-items: start; }
+      .timeline-help { width: 100%; margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M6 3h9l3 3v15H6V3z" fill="white" opacity=".92"/>
+            <path d="M15 3v4h4" stroke="#202124" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M9 11h6M9 15h5" stroke="#202124" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        Chrono Keep Board
+      </div>
+      <label class="search" aria-label="検索">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input id="searchInput" placeholder="メモを検索">
+      </label>
+      <div class="toolbar">
+        <button id="addNote" class="primary" title="新規メモ">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          新規
+        </button>
+        <button id="historyBtn" title="履歴">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          履歴
+        </button>
+        <button id="timelineBtn" title="3D年表">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18 12 6l8 12M4 18h16M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          3D年表
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="board-shell" aria-label="2次元付箋ボード">
+        <div class="board" id="boardScroll">
+          <div class="canvas" id="canvas"></div>
+        </div>
+      </section>
+
+      <aside class="side" id="sidePanel">
+        <div class="side-head">
+          <h2 id="sideTitle">履歴</h2>
+          <p id="sideSummary">メモを選ぶと、作成、本文全体、段落、言葉単位の更新履歴を確認できます。</p>
+        </div>
+        <div class="tabs">
+          <button id="tabSelected" class="active">選択メモ</button>
+          <button id="tabAll">全体</button>
+          <button id="tabTree">ツリー</button>
+        </div>
+        <div class="panel">
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <section class="timeline" id="timelineOverlay" aria-label="3D年表">
+    <div class="timeline-bar">
+      <h2>3D年表</h2>
+      <select id="timelineScope">
+        <option value="all">全粒度</option>
+        <option value="note">メモ単位</option>
+        <option value="paragraph">段落単位</option>
+        <option value="word">言葉単位</option>
+      </select>
+      <button id="timelineReset">視点リセット</button>
+      <button id="closeTimeline">閉じる</button>
+      <div class="timeline-help">ドラッグで回転、ホイールでズーム。横軸が時間、奥行きが粒度です。</div>
+    </div>
+    <canvas id="timeline3d"></canvas>
+  </section>
+
+  <input id="imageInput" class="hidden-file" type="file" accept="image/*" multiple>
+  <section class="image-modal" id="imageModal" aria-label="画像プレビュー">
+    <div class="image-dialog">
+      <div class="image-dialog-head">
+        <span id="imageModalTitle">画像</span>
+        <button id="closeImageModal">閉じる</button>
+      </div>
+      <img id="imageModalImg" alt="メモに貼り込んだ画像">
+    </div>
+  </section>
+  <div id="toast" class="toast"></div>
+
+  <script type="module">
+    const STORE_KEY = "chrono-keep-board-v2";
+    const palette = ["#fff8c7", "#d7f0ff", "#e2f4d7", "#fce3ef", "#e8e0ff", "#ffe3c2", "#dff3ec"];
+    const typeLabel = { create: "作成", full: "本文全体", paragraph: "段落", word: "言葉" };
+    const typeDepth = { create: -90, full: -30, paragraph: 35, word: 100 };
+    const typeColor = { create: 0xea4335, full: 0x4285f4, paragraph: 0x34a853, word: 0xfbbc04 };
+
+    let state = loadState();
+    let selectedId = state.selectedId || state.notes[0]?.id || null;
+    let historyMode = "selected";
+    let drag = null;
+    let imageTargetId = null;
+    let threeRuntime = null;
+
+    const el = {
+      canvas: document.getElementById("canvas"),
+      addNote: document.getElementById("addNote"),
+      historyBtn: document.getElementById("historyBtn"),
+      timelineBtn: document.getElementById("timelineBtn"),
+      historyList: document.getElementById("historyList"),
+      tabSelected: document.getElementById("tabSelected"),
+      tabAll: document.getElementById("tabAll"),
+      tabTree: document.getElementById("tabTree"),
+      searchInput: document.getElementById("searchInput"),
+      imageInput: document.getElementById("imageInput"),
+      imageModal: document.getElementById("imageModal"),
+      imageModalTitle: document.getElementById("imageModalTitle"),
+      imageModalImg: document.getElementById("imageModalImg"),
+      closeImageModal: document.getElementById("closeImageModal"),
+      toast: document.getElementById("toast"),
+      timelineOverlay: document.getElementById("timelineOverlay"),
+      timelineScope: document.getElementById("timelineScope"),
+      timelineReset: document.getElementById("timelineReset"),
+      closeTimeline: document.getElementById("closeTimeline"),
+      timeline3d: document.getElementById("timeline3d"),
+      sideTitle: document.getElementById("sideTitle"),
+      sideSummary: document.getElementById("sideSummary")
+    };
+
+    if (state.notes.length === 0) {
+      createNote({
+        title: "最初のメモ",
+        text: "ここに文章を書きます。\n\n段落ごとの更新と、言葉ごとの履歴が自動で残ります。",
+        x: 90,
+        y: 90,
+        color: palette[0]
+      });
+      createNote({
+        title: "画像メモ",
+        text: "画像ボタンから写真やスクリーンショットを貼り込めます。",
+        x: 390,
+        y: 130,
+        color: palette[1]
+      });
+    }
+
+    render();
+
+    el.addNote.addEventListener("click", () => {
+      const note = createNote({
+        title: "無題のメモ",
+        text: "",
+        x: 120 + state.notes.length * 24,
+        y: 120 + state.notes.length * 18,
+        color: palette[state.notes.length % palette.length]
+      });
+      selectedId = note.id;
+      persist();
+      render();
+      toast("新しいメモを作成しました");
+    });
+
+    el.historyBtn.addEventListener("click", () => {
+      historyMode = "selected";
+      el.tabSelected.classList.add("active");
+      el.tabAll.classList.remove("active");
+      el.tabTree.classList.remove("active");
+      document.getElementById("sidePanel").scrollIntoView({ block: "nearest", behavior: "smooth" });
+      renderSidePanel();
+    });
+
+    el.timelineBtn.addEventListener("click", openTimeline);
+    el.closeTimeline.addEventListener("click", closeTimeline);
+    el.timelineReset.addEventListener("click", () => {
+      if (threeRuntime) {
+        threeRuntime.camera.position.set(0, 360, 620);
+        threeRuntime.controls.target.set(0, 0, 0);
+        threeRuntime.controls.update();
+      }
+    });
+    el.timelineScope.addEventListener("change", () => renderTimelineScene());
+
+    el.tabSelected.addEventListener("click", () => {
+      historyMode = "selected";
+      el.tabSelected.classList.add("active");
+      el.tabAll.classList.remove("active");
+      el.tabTree.classList.remove("active");
+      renderSidePanel();
+    });
+
+    el.tabAll.addEventListener("click", () => {
+      historyMode = "all";
+      el.tabAll.classList.add("active");
+      el.tabSelected.classList.remove("active");
+      el.tabTree.classList.remove("active");
+      renderSidePanel();
+    });
+
+    el.tabTree.addEventListener("click", () => {
+      historyMode = "tree";
+      el.tabTree.classList.add("active");
+      el.tabSelected.classList.remove("active");
+      el.tabAll.classList.remove("active");
+      renderSidePanel();
+    });
+
+    el.searchInput.addEventListener("input", renderNotes);
+
+    el.historyList.addEventListener("click", (event) => {
+      const imageLink = event.target.closest("[data-image-note]");
+      if (imageLink) {
+        const note = findNote(imageLink.dataset.imageNote);
+        const image = note?.images[Number(imageLink.dataset.imageIndex)];
+        if (image) openImageModal(image, note.title, Number(imageLink.dataset.imageIndex) + 1);
+        return;
+      }
+
+      const noteLink = event.target.closest("[data-tree-note]");
+      if (noteLink) {
+        selectedId = noteLink.dataset.treeNote;
+        historyMode = "selected";
+        el.tabSelected.classList.add("active");
+        el.tabAll.classList.remove("active");
+        el.tabTree.classList.remove("active");
+        persist();
+        render();
+      }
+    });
+
+    el.closeImageModal.addEventListener("click", closeImageModal);
+    el.imageModal.addEventListener("click", (event) => {
+      if (event.target === el.imageModal) closeImageModal();
+    });
+
+    el.imageInput.addEventListener("change", async () => {
+      const note = findNote(imageTargetId);
+      if (!note || el.imageInput.files.length === 0) return;
+      const files = Array.from(el.imageInput.files).slice(0, 8);
+      const images = await Promise.all(files.map(readFileAsDataURL));
+      note.images.push(...images);
+      recordEvent(note, "full", "画像を追加", `画像 ${images.length} 件を貼り込みました`);
+      note.updatedAt = now();
+      persist();
+      render();
+      el.imageInput.value = "";
+      toast("画像を貼り込みました");
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && el.imageModal.classList.contains("open")) closeImageModal();
+      if (event.key === "Escape" && el.timelineOverlay.classList.contains("open")) closeTimeline();
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        el.addNote.click();
+      }
+    });
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return { notes: [], selectedId: null };
+        const parsed = JSON.parse(raw);
+        const notes = Array.isArray(parsed.notes) ? parsed.notes.map(normalizeNote) : [];
+        return { notes, selectedId: parsed.selectedId || null };
+      } catch {
+        return { notes: [], selectedId: null };
+      }
+    }
+
+    function normalizeNote(note) {
+      return {
+        ...note,
+        parentId: note.parentId || null,
+        images: Array.isArray(note.images) ? note.images : [],
+        history: Array.isArray(note.history) ? note.history : [],
+        lastText: note.lastText ?? note.text ?? "",
+        w: note.w || 260,
+        h: note.h || 188
+      };
+    }
+
+    function persist() {
+      state.selectedId = selectedId;
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    }
+
+    function now() {
+      return new Date().toISOString();
+    }
+
+    function uid() {
+      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function createNote(seed = {}) {
+      const createdAt = now();
+      const note = {
+        id: uid(),
+        parentId: seed.parentId || null,
+        title: seed.title || "無題のメモ",
+        text: seed.text || "",
+        images: [],
+        x: seed.x ?? 80,
+        y: seed.y ?? 80,
+        w: 260,
+        h: 188,
+        color: seed.color || palette[0],
+        pinned: false,
+        createdAt,
+        updatedAt: createdAt,
+        history: [],
+        lastText: seed.text || ""
+      };
+      if (note.parentId) {
+        const parentIndex = state.notes.findIndex(item => item.id === note.parentId);
+        state.notes.splice(parentIndex + 1, 0, note);
+      } else {
+        state.notes.unshift(note);
+      }
+      recordEvent(note, "create", "メモ作成", note.text || note.title, createdAt);
+      recordTextHistory(note, "", note.text || "", createdAt);
+      if (note.parentId) {
+        const parent = findNote(note.parentId);
+        if (parent) {
+          parent.updatedAt = createdAt;
+          recordEvent(parent, "full", "子メモ追加", note.title, createdAt);
+        }
+      }
+      selectedId = note.id;
+      persist();
+      return note;
+    }
+
+    function createChildNote(parent) {
+      const child = createNote({
+        parentId: parent.id,
+        title: "子メモ",
+        text: "",
+        x: parent.x + 28,
+        y: parent.y + 28,
+        color: parent.color
+      });
+      selectedId = child.id;
+      persist();
+      render();
+      toast("子メモを貼り込みました");
+    }
+
+    function recordEvent(note, type, label, value, at = now()) {
+      note.history.push({
+        id: uid(),
+        type,
+        label,
+        value: String(value || ""),
+        at,
+        noteId: note.id,
+        noteTitle: note.title
+      });
+    }
+
+    function recordTextHistory(note, oldText, newText, at = now()) {
+      if (oldText === newText) return;
+      recordEvent(note, "full", "本文更新", newText, at);
+
+      const oldParagraphs = splitParagraphs(oldText);
+      const newParagraphs = splitParagraphs(newText);
+      newParagraphs.forEach((paragraph, index) => {
+        if (paragraph && paragraph !== oldParagraphs[index]) {
+          recordEvent(note, "paragraph", `段落 ${index + 1}`, paragraph, at);
+        }
+      });
+
+      const oldWords = new Set(tokenize(oldText));
+      tokenize(newText).forEach((word) => {
+        if (!oldWords.has(word)) recordEvent(note, "word", word, word, at);
+      });
+    }
+
+    function splitParagraphs(text) {
+      return String(text || "")
+        .split(/\\n\\s*\\n|\\n/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
+
+    function tokenize(text) {
+      const matches = String(text || "").match(/[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}ー]+|[A-Za-z0-9_]+/gu);
+      return matches ? matches.map(w => w.toLowerCase()) : [];
+    }
+
+    function findNote(id) {
+      return state.notes.find(note => note.id === id);
+    }
+
+    function childNotes(parentId) {
+      return state.notes
+        .filter(note => note.parentId === parentId)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+
+    function descendantIds(parentId) {
+      const ids = [];
+      const walk = (id) => {
+        childNotes(id).forEach(child => {
+          ids.push(child.id);
+          walk(child.id);
+        });
+      };
+      walk(parentId);
+      return ids;
+    }
+
+    function noteMatchesQuery(note, query) {
+      if (!query) return true;
+      if (`${note.title} ${note.text}`.toLowerCase().includes(query)) return true;
+      return childNotes(note.id).some(child => noteMatchesQuery(child, query));
+    }
+
+    function render() {
+      renderNotes();
+      renderSidePanel();
+    }
+
+    function renderNotes() {
+      const query = el.searchInput.value.trim().toLowerCase();
+      const notes = [...state.notes]
+        .filter(note => !note.parentId)
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt))
+        .filter(note => noteMatchesQuery(note, query));
+
+      el.canvas.innerHTML = "";
+      notes.forEach(note => {
+        const children = childNotes(note.id);
+        const card = document.createElement("article");
+        card.className = `note${note.id === selectedId ? " selected" : ""}${note.pinned ? " pinned" : ""}`;
+        card.style.left = `${note.x}px`;
+        card.style.top = `${note.y}px`;
+        card.style.width = `${note.w || 260}px`;
+        card.style.height = `${note.h || 188}px`;
+        card.style.background = note.color;
+        card.dataset.id = note.id;
+        card.innerHTML = `
+          <div class="note-head">
+            <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
+          </div>
+          <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
+          <textarea aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>
+          <div>
+            <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
+            <div class="child-notes">${children.map(child => renderChildNote(child)).join("")}</div>
+            <div class="note-actions">
+              <span>
+                <button class="pin" title="ピン留め">${iconPin()}</button>
+                <button class="image" title="画像を追加">${iconImage()}</button>
+                <button class="add-child" title="子メモを追加">${iconNested()}</button>
+                <button class="history" title="このメモの履歴">${iconHistory()}</button>
+              </span>
+              <button class="delete" title="削除">${iconTrash()}</button>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener("pointerdown", (event) => {
+          selectedId = note.id;
+          persist();
+          renderSidePanel();
+          document.querySelectorAll(".note").forEach(n => n.classList.toggle("selected", n.dataset.id === selectedId));
+        });
+
+        const head = card.querySelector(".note-head");
+        head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
+
+        const title = card.querySelector(".note-title");
+        title.addEventListener("change", () => {
+          note.title = title.value.trim() || "無題のメモ";
+          note.updatedAt = now();
+          recordEvent(note, "full", "タイトル更新", note.title);
+          persist();
+          render();
+        });
+
+        const textarea = card.querySelector("textarea");
+        textarea.addEventListener("input", () => {
+          textarea.style.height = "auto";
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        });
+        textarea.addEventListener("change", () => {
+          const at = now();
+          const oldText = note.lastText || "";
+          note.text = textarea.value;
+          recordTextHistory(note, oldText, note.text, at);
+          note.lastText = note.text;
+          note.updatedAt = at;
+          persist();
+          render();
+        });
+
+        card.querySelector(".pin").addEventListener("click", (event) => {
+          event.stopPropagation();
+          note.pinned = !note.pinned;
+          note.updatedAt = now();
+          recordEvent(note, "full", note.pinned ? "ピン留め" : "ピン解除", note.title);
+          persist();
+          render();
+        });
+
+        card.querySelector(".image").addEventListener("click", (event) => {
+          event.stopPropagation();
+          imageTargetId = note.id;
+          el.imageInput.click();
+        });
+
+        card.querySelector(".add-child").addEventListener("click", (event) => {
+          event.stopPropagation();
+          createChildNote(note);
+        });
+
+        card.querySelector(".history").addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectedId = note.id;
+          historyMode = "selected";
+          el.tabSelected.classList.add("active");
+          el.tabAll.classList.remove("active");
+          el.tabTree.classList.remove("active");
+          persist();
+          render();
+        });
+
+        card.querySelector(".delete").addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteNoteTree(note.id);
+          persist();
+          render();
+          toast("メモを削除しました");
+        });
+
+        wireChildNotes(card);
+
+        card.addEventListener("mouseup", () => {
+          const rect = card.getBoundingClientRect();
+          const canvasRect = el.canvas.getBoundingClientRect();
+          note.w = Math.round(rect.width);
+          note.h = Math.round(rect.height);
+          note.x = Math.round(rect.left - canvasRect.left + el.canvas.scrollLeft);
+          note.y = Math.round(rect.top - canvasRect.top + el.canvas.scrollTop);
+          persist();
+        });
+
+        el.canvas.appendChild(card);
+      });
+    }
+
+    function renderChildNote(child) {
+      const grandchildren = childNotes(child.id);
+      return `
+        <section class="child-note${child.id === selectedId ? " selected" : ""}" data-child-id="${child.id}">
+          <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
+          <textarea class="child-text" aria-label="子メモ本文" placeholder="子メモを書く">${escapeHtml(child.text)}</textarea>
+          <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件 / 子 ${grandchildren.length} 件</div>
+          <div class="child-actions">
+            <span>
+              <button class="child-select" title="選択">${iconSelect()}</button>
+              <button class="child-image" title="画像を追加">${iconImage()}</button>
+              <button class="child-add" title="さらに子メモを追加">${iconNested()}</button>
+            </span>
+            <button class="child-delete" title="削除">${iconTrash()}</button>
+          </div>
+          ${grandchildren.length ? `<div class="child-notes">${grandchildren.map(grandchild => renderChildNote(grandchild)).join("")}</div>` : ""}
+        </section>
+      `;
+    }
+
+    function wireChildNotes(scope) {
+      scope.querySelectorAll(".child-note").forEach(childCard => {
+        const child = findNote(childCard.dataset.childId);
+        if (!child) return;
+
+        childCard.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+          selectedId = child.id;
+          persist();
+          renderSidePanel();
+          document.querySelectorAll(".child-note").forEach(item => item.classList.toggle("selected", item.dataset.childId === selectedId));
+        });
+
+        childCard.querySelector(".child-title").addEventListener("change", (event) => {
+          child.title = event.target.value.trim() || "子メモ";
+          child.updatedAt = now();
+          recordEvent(child, "full", "タイトル更新", child.title);
+          persist();
+          render();
+        });
+
+        childCard.querySelector(".child-text").addEventListener("change", (event) => {
+          const at = now();
+          const oldText = child.lastText || "";
+          child.text = event.target.value;
+          recordTextHistory(child, oldText, child.text, at);
+          child.lastText = child.text;
+          child.updatedAt = at;
+          persist();
+          render();
+        });
+
+        childCard.querySelector(".child-select").addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectedId = child.id;
+          historyMode = "selected";
+          el.tabSelected.classList.add("active");
+          el.tabAll.classList.remove("active");
+          el.tabTree.classList.remove("active");
+          persist();
+          render();
+        });
+
+        childCard.querySelector(".child-image").addEventListener("click", (event) => {
+          event.stopPropagation();
+          imageTargetId = child.id;
+          el.imageInput.click();
+        });
+
+        childCard.querySelector(".child-add").addEventListener("click", (event) => {
+          event.stopPropagation();
+          createChildNote(child);
+        });
+
+        childCard.querySelector(".child-delete").addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteNoteTree(child.id);
+          persist();
+          render();
+          toast("子メモを削除しました");
+        });
+      });
+    }
+
+    function deleteNoteTree(noteId) {
+      const removeIds = new Set([noteId, ...descendantIds(noteId)]);
+      state.notes = state.notes.filter(item => !removeIds.has(item.id));
+      if (removeIds.has(selectedId)) {
+        selectedId = state.notes[0]?.id || null;
+      }
+    }
+
+    function startDrag(event, note, card) {
+      if (event.target.closest("input,button,textarea")) return;
+      event.preventDefault();
+      card.setPointerCapture(event.pointerId);
+      drag = {
+        id: note.id,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        noteX: note.x,
+        noteY: note.y,
+        moved: false
+      };
+      card.addEventListener("pointermove", onDrag);
+      card.addEventListener("pointerup", endDrag, { once: true });
+    }
+
+    function onDrag(event) {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const note = findNote(drag.id);
+      if (!note) return;
+      note.x = Math.max(0, drag.noteX + event.clientX - drag.startX);
+      note.y = Math.max(0, drag.noteY + event.clientY - drag.startY);
+      drag.moved = true;
+      const card = document.querySelector(`.note[data-id="${note.id}"]`);
+      if (card) {
+        card.style.left = `${note.x}px`;
+        card.style.top = `${note.y}px`;
+      }
+    }
+
+    function endDrag(event) {
+      const card = event.currentTarget;
+      card.removeEventListener("pointermove", onDrag);
+      if (drag?.moved) {
+        const note = findNote(drag.id);
+        if (note) {
+          note.updatedAt = now();
+          persist();
+        }
+      }
+      drag = null;
+    }
+
+    function renderSidePanel() {
+      if (historyMode === "tree") {
+        renderTreeList();
+        return;
+      }
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const selected = findNote(selectedId);
+      const events = getVisibleEvents();
+      el.sideTitle.textContent = historyMode === "all" ? "全メモの履歴" : selected ? `${selected.title} の履歴` : "履歴";
+      el.sideSummary.textContent = historyMode === "all"
+        ? "すべてのメモの作成、本文全体、段落、言葉単位の更新を時系列で表示します。"
+        : "選択中メモの粒度別履歴を時系列で表示します。";
+
+      if (events.length === 0) {
+        el.historyList.innerHTML = `<div class="empty">履歴はまだありません。</div>`;
+        return;
+      }
+
+      el.historyList.innerHTML = events.map(event => `
+        <div class="event">
+          <div class="event-top">
+            <span class="pill ${event.type}">${typeLabel[event.type] || event.type}</span>
+            <span>${formatDateTime(event.at)}</span>
+          </div>
+          <div class="event-note">${escapeHtml(event.noteTitle || findNote(event.noteId)?.title || "メモ")}</div>
+          <div class="event-body">${escapeHtml(event.label)}${event.value ? "\\n" + escapeHtml(event.value) : ""}</div>
+        </div>
+      `).join("");
+    }
+
+    function getVisibleEvents() {
+      if (historyMode !== "all" && !selectedId) return [];
+      const source = historyMode === "all"
+        ? state.notes
+        : state.notes.filter(note => note.id === selectedId || descendantIds(selectedId).includes(note.id));
+      return source.flatMap(note => note.history.map(event => ({ ...event, noteTitle: note.title })))
+        .sort((a, b) => new Date(b.at) - new Date(a.at));
+    }
+
+    function renderTreeList() {
+      const roots = state.notes
+        .filter(note => !note.parentId)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+      el.sideTitle.textContent = "メモツリー";
+      el.sideSummary.textContent = "包含関係をテキストだけで表示します。画像はリンクとして並び、押すとポップアップで開きます。";
+
+      if (roots.length === 0) {
+        el.historyList.innerHTML = `<div class="empty">ツリー化できるメモはまだありません。</div>`;
+        return;
+      }
+
+      el.historyList.innerHTML = `<div class="tree-list">${roots.map(note => renderTreeItem(note, 0)).join("")}</div>`;
+    }
+
+    function renderTreeItem(note, depth) {
+      const children = childNotes(note.id);
+      const images = note.images.map((_, index) => `
+        <button class="tree-image-link" data-image-note="${note.id}" data-image-index="${index}">画像${index + 1}</button>
+      `).join("");
+
+      return `
+        <div class="tree-item" style="margin-left:${depth * 16}px">
+          <button class="tree-title tree-note-link" data-tree-note="${note.id}">${escapeHtml(note.title)}</button>
+          <div class="tree-text">${escapeHtml(note.text || "本文なし")}</div>
+          ${images ? `<div class="tree-images">${images}</div>` : ""}
+        </div>
+        ${children.map(child => renderTreeItem(child, depth + 1)).join("")}
+      `;
+    }
+
+    function openImageModal(src, noteTitle, imageNumber) {
+      el.imageModalTitle.textContent = `${noteTitle} / 画像${imageNumber}`;
+      el.imageModalImg.src = src;
+      el.imageModal.classList.add("open");
+    }
+
+    function closeImageModal() {
+      el.imageModal.classList.remove("open");
+      el.imageModalImg.removeAttribute("src");
+    }
+
+    async function openTimeline() {
+      el.timelineOverlay.classList.add("open");
+      await initTimeline();
+      renderTimelineScene();
+      resizeTimeline();
+      toast("3D年表を開きました");
+    }
+
+    function closeTimeline() {
+      el.timelineOverlay.classList.remove("open");
+    }
+
+    async function initTimeline() {
+      if (threeRuntime) return;
+      try {
+        const THREE = await import("./vendor/three/three.module.js");
+        const { OrbitControls } = await import("./vendor/three/examples/jsm/controls/OrbitControls.js");
+        const renderer = new THREE.WebGLRenderer({ canvas: el.timeline3d, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setClearColor(0x111827, 1);
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x111827, 580, 1420);
+        const camera = new THREE.PerspectiveCamera(50, 1, 1, 3000);
+        camera.position.set(0, 360, 620);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0, 0);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2.2));
+        const light = new THREE.DirectionalLight(0xffffff, 1.8);
+        light.position.set(260, 420, 280);
+        scene.add(light);
+        threeRuntime = { THREE, renderer, scene, camera, controls, objects: [] };
+        window.addEventListener("resize", resizeTimeline);
+        animateTimeline();
+      } catch (error) {
+        el.timeline3d.replaceWith(Object.assign(document.createElement("div"), {
+          className: "empty",
+          textContent: "Three.jsを読み込めませんでした。ネットワーク接続がある状態で再度開いてください。"
+        }));
+      }
+    }
+
+    function resizeTimeline() {
+      if (!threeRuntime) return;
+      const rect = el.timeline3d.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      threeRuntime.camera.aspect = rect.width / rect.height;
+      threeRuntime.camera.updateProjectionMatrix();
+      threeRuntime.renderer.setSize(rect.width, rect.height, false);
+    }
+
+    function animateTimeline() {
+      if (!threeRuntime) return;
+      requestAnimationFrame(animateTimeline);
+      threeRuntime.controls.update();
+      threeRuntime.objects.forEach((obj, i) => {
+        obj.rotation.y += 0.002 + (i % 4) * 0.0004;
+      });
+      threeRuntime.renderer.render(threeRuntime.scene, threeRuntime.camera);
+    }
+
+    function renderTimelineScene() {
+      if (!threeRuntime) return;
+      const { THREE, scene } = threeRuntime;
+      threeRuntime.objects.forEach(obj => scene.remove(obj));
+      threeRuntime.objects = [];
+
+      const scope = el.timelineScope.value;
+      const events = state.notes.flatMap((note, noteIndex) => note.history.map(event => ({
+        ...event,
+        noteTitle: note.title,
+        noteIndex
+      }))).filter(event => {
+        if (scope === "all") return true;
+        if (scope === "note") return event.type === "create" || event.type === "full";
+        return event.type === scope;
+      }).sort((a, b) => new Date(a.at) - new Date(b.at));
+
+      const times = events.map(event => new Date(event.at).getTime());
+      const min = Math.min(...times, Date.now());
+      const max = Math.max(...times, min + 1);
+      const range = Math.max(1, max - min);
+
+      addGrid(THREE, scene, threeRuntime.objects);
+      addAxisLabels(THREE, scene, threeRuntime.objects, min, max);
+
+      events.forEach((event, index) => {
+        const x = ((new Date(event.at).getTime() - min) / range - 0.5) * 760;
+        const y = 120 - event.noteIndex * 58;
+        const z = typeDepth[event.type] ?? 0;
+        const radius = event.type === "word" ? 8 : event.type === "paragraph" ? 13 : 18;
+        const geometry = event.type === "word"
+          ? new THREE.SphereGeometry(radius, 24, 16)
+          : new THREE.BoxGeometry(radius * 1.8, radius * 1.8, radius * 1.8);
+        const material = new THREE.MeshStandardMaterial({
+          color: typeColor[event.type] || 0xffffff,
+          roughness: .42,
+          metalness: .08,
+          emissive: typeColor[event.type] || 0xffffff,
+          emissiveIntensity: .08
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        scene.add(mesh);
+        threeRuntime.objects.push(mesh);
+
+        const label = makeLabel(THREE, `${typeLabel[event.type]}: ${event.label}`.slice(0, 34), event.noteTitle, formatDateTime(event.at));
+        label.position.set(x, y + 30, z);
+        scene.add(label);
+        threeRuntime.objects.push(label);
+
+        if (index > 0) {
+          const prev = events[index - 1];
+          const px = ((new Date(prev.at).getTime() - min) / range - 0.5) * 760;
+          const py = 120 - prev.noteIndex * 58;
+          const pz = typeDepth[prev.type] ?? 0;
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(px, py, pz),
+            new THREE.Vector3(x, y, z)
+          ]);
+          const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18 }));
+          scene.add(line);
+          threeRuntime.objects.push(line);
+        }
+      });
+    }
+
+    function addGrid(THREE, scene, objects) {
+      const grid = new THREE.GridHelper(860, 20, 0x94a3b8, 0x334155);
+      grid.position.y = -170;
+      grid.rotation.x = Math.PI / 2;
+      scene.add(grid);
+      objects.push(grid);
+
+      const axisMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .45 });
+      const axis = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-430, -170, 0),
+        new THREE.Vector3(430, -170, 0)
+      ]);
+      const line = new THREE.Line(axis, axisMat);
+      scene.add(line);
+      objects.push(line);
+
+      Object.entries(typeDepth).forEach(([type, z]) => {
+        const lane = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-430, -170, z),
+          new THREE.Vector3(430, -170, z)
+        ]);
+        const laneLine = new THREE.Line(lane, new THREE.LineBasicMaterial({ color: typeColor[type], transparent: true, opacity: .5 }));
+        scene.add(laneLine);
+        objects.push(laneLine);
+        const label = makeLabel(THREE, typeLabel[type], "", "");
+        label.position.set(-455, -150, z);
+        scene.add(label);
+        objects.push(label);
+      });
+    }
+
+    function addAxisLabels(THREE, scene, objects, min, max) {
+      const start = makeLabel(THREE, "開始", "", formatDateTime(new Date(min).toISOString()));
+      start.position.set(-410, -130, -145);
+      const end = makeLabel(THREE, "最新", "", formatDateTime(new Date(max).toISOString()));
+      end.position.set(360, -130, -145);
+      scene.add(start, end);
+      objects.push(start, end);
+    }
+
+    function makeLabel(THREE, line1, line2, line3) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 160;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "rgba(255,255,255,.88)";
+      roundRect(ctx, 8, 8, 496, 144, 18);
+      ctx.fill();
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 28px system-ui, sans-serif";
+      ctx.fillText(line1 || "", 24, 50);
+      ctx.fillStyle = "#374151";
+      ctx.font = "22px system-ui, sans-serif";
+      if (line2) ctx.fillText(line2.slice(0, 32), 24, 88);
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "18px system-ui, sans-serif";
+      if (line3) ctx.fillText(line3, 24, 122);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(112, 35, 1);
+      return sprite;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replaceAll('"', "&quot;");
+    }
+
+    function formatDate(iso) {
+      return new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+    }
+
+    function formatDateTime(iso) {
+      return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(iso));
+    }
+
+    function toast(message) {
+      el.toast.textContent = message;
+      el.toast.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => el.toast.classList.remove("show"), 1800);
+    }
+
+    function iconPin() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 4 6 6-4 1-4 9-2-2 4-9-1-1-9 4-2-2 9-4 1-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+    }
+    function iconImage() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.8"/><path d="m7 16 4-4 3 3 2-2 3 3M8.5 9.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconHistory() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 5v5h5M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconNested() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6h6v6H5zM13 12h6v6h-6zM11 9h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+    }
+    function iconSelect() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconTrash() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+  </script>
+</body>
+</html>
