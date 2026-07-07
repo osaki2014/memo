@@ -182,6 +182,9 @@
       perspective: 1100px;
       transform-style: preserve-3d;
       overflow: visible;
+      background:
+        linear-gradient(90deg, rgba(218,220,224,.75) 1px, transparent 1px),
+        linear-gradient(rgba(218,220,224,.75) 1px, transparent 1px);
       background-size: 56px 56px;
     }
 
@@ -197,8 +200,34 @@
       height: 100%;
       z-index: 2;
       display: block;
-      background: #111827;
+      background: #ffffff;
     }
+
+    .markdown-preview {
+      width: 100%;
+      min-height: 86px;
+      color: var(--ink);
+      line-height: 1.22;
+      font-size: 12px;
+      outline: none;
+      overflow: auto;
+    }
+
+    .markdown-preview h1,
+    .markdown-preview h2,
+    .markdown-preview h3 {
+      margin: 4px 0 3px;
+      line-height: 1.1;
+    }
+
+    .markdown-preview h1 { font-size: 16px; }
+    .markdown-preview h2 { font-size: 14px; }
+    .markdown-preview h3 { font-size: 13px; }
+    .markdown-preview p { margin: 2px 0 4px; }
+    .markdown-preview ul,
+    .markdown-preview ol { margin: 3px 0 5px 18px; padding: 0; }
+    .markdown-preview code { background: rgba(32,33,36,.08); border-radius: 4px; padding: 1px 4px; }
+    .markdown-preview blockquote { margin: 4px 0; padding-left: 8px; border-left: 3px solid rgba(60,64,67,.24); color: var(--muted); }
 
     .tag-3d-controls {
       position: sticky;
@@ -908,16 +937,25 @@
         <input id="searchInput" placeholder="メモを検索">
       </label>
       <div class="toolbar">
-        <select id="arrangeSelect" class="sort-control" title="整列">
+        <select id="arrangeSelect" class="sort-control" title="2D整列">
           <option value="manual">手動配置</option>
           <option value="color">色順に整列</option>
           <option value="tag">タグ順に整列</option>
           <option value="updated">最新更新順に整列</option>
         </select>
-        <select id="depthModeSelect" class="sort-control" title="3D奥行き" hidden>
-          <option value="even">奥行き均等</option>
-          <option value="time">時系列</option>
+        <select id="granularitySelect" class="sort-control" title="3D粒度" hidden>
+          <option value="all">全粒度</option>
+          <option value="note">メモ単位</option>
+          <option value="paragraph">段落単位</option>
+          <option value="word">言葉単位</option>
         </select>
+        <select id="classifySelect" class="sort-control" title="3D分類" hidden>
+          <option value="color">色単位</option>
+          <option value="tag">タグ単位</option>
+        </select>
+        <button id="markdownToggle" title="Markdown表示切替">MD表示</button>
+        <button id="view2DBtn" class="active" title="2D表示">2D</button>
+        <button id="view3DBtn" title="3D表示">3D</button>
         <button id="addNote" class="primary" title="新規メモ">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           新規
@@ -929,14 +967,6 @@
         <button id="historyBtn" title="履歴">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           履歴
-        </button>
-        <button id="toggleSideBtn" title="履歴パネル">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM15 5v14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-          パネル
-        </button>
-        <button id="timelineBtn" title="3D年表">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18 12 6l8 12M4 18h16M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          3D年表
         </button>
       </div>
     </header>
@@ -1015,19 +1045,23 @@
     let threeRuntime = null;
     let tag3dRuntime = null;
     let tag3dView = "front";
+    let boardMode = "2d";
+    let markdownPreview = false;
 
     const el = {
       app: document.getElementById("app"),
       canvas: document.getElementById("canvas"),
       arrangeSelect: document.getElementById("arrangeSelect"),
-      depthModeSelect: document.getElementById("depthModeSelect"),
+      granularitySelect: document.getElementById("granularitySelect"),
+      classifySelect: document.getElementById("classifySelect"),
+      markdownToggle: document.getElementById("markdownToggle"),
+      view2DBtn: document.getElementById("view2DBtn"),
+      view3DBtn: document.getElementById("view3DBtn"),
       addNote: document.getElementById("addNote"),
       importKeepBtn: document.getElementById("importKeepBtn"),
       keepImportInput: document.getElementById("keepImportInput"),
       historyBtn: document.getElementById("historyBtn"),
-      toggleSideBtn: document.getElementById("toggleSideBtn"),
       closeSideBtn: document.getElementById("closeSideBtn"),
-      timelineBtn: document.getElementById("timelineBtn"),
       historyList: document.getElementById("historyList"),
       tabSelected: document.getElementById("tabSelected"),
       tabAll: document.getElementById("tabAll"),
@@ -1067,16 +1101,37 @@
 
     render();
 
-    el.toggleSideBtn.addEventListener("click", () => {
-      el.app.classList.toggle("side-collapsed");
-    });
-
     el.closeSideBtn.addEventListener("click", () => {
       el.app.classList.add("side-collapsed");
     });
 
+    el.markdownToggle.addEventListener("click", () => {
+      markdownPreview = !markdownPreview;
+      el.markdownToggle.textContent = markdownPreview ? "MD編集" : "MD表示";
+      renderNotes();
+    });
+
+    el.view2DBtn.addEventListener("click", () => {
+      boardMode = "2d";
+      el.view2DBtn.classList.add("active");
+      el.view3DBtn.classList.remove("active");
+      el.arrangeSelect.hidden = false;
+      el.granularitySelect.hidden = true;
+      el.classifySelect.hidden = true;
+      renderNotes();
+    });
+
+    el.view3DBtn.addEventListener("click", () => {
+      boardMode = "3d";
+      el.view3DBtn.classList.add("active");
+      el.view2DBtn.classList.remove("active");
+      el.arrangeSelect.hidden = true;
+      el.granularitySelect.hidden = false;
+      el.classifySelect.hidden = false;
+      renderNotes();
+    });
+
     el.arrangeSelect.addEventListener("change", () => {
-      el.depthModeSelect.hidden = el.arrangeSelect.value !== "tag";
       if (el.arrangeSelect.value !== "manual") {
         arrangeNotes(el.arrangeSelect.value);
       } else {
@@ -1085,9 +1140,8 @@
       }
     });
 
-    el.depthModeSelect.addEventListener("change", () => {
-      if (el.arrangeSelect.value === "tag") arrangeNotes("tag");
-    });
+    el.granularitySelect.addEventListener("change", renderNotes);
+    el.classifySelect.addEventListener("change", renderNotes);
 
     el.addNote.addEventListener("click", () => {
       const note = createNote({
@@ -1133,7 +1187,7 @@
       renderSidePanel();
     });
 
-    el.timelineBtn.addEventListener("click", openTimeline);
+    // 3D年表は独立オーバーレイではなく、3Dボード内で表示します。
     el.closeTimeline.addEventListener("click", closeTimeline);
     el.timelineReset.addEventListener("click", () => {
       if (threeRuntime) {
@@ -1529,10 +1583,6 @@
       const active = (view) => view === tag3dView ? " active" : "";
       return `
         <div class="tag-3d-controls">
-          <select class="depth-mode" id="inlineDepthMode" title="奥行きモード">
-            <option value="even"${el.depthModeSelect.value === "even" ? " selected" : ""}>奥行き均等</option>
-            <option value="time"${el.depthModeSelect.value === "time" ? " selected" : ""}>時系列</option>
-          </select>
           <div class="view-cube" aria-label="ビューキューブ">
             <span></span><button data-view="top" class="${active("top")}">上</button><span></span>
             <button data-view="left" class="${active("left")}">左</button><button data-view="front" class="${active("front")}">前</button><button data-view="right" class="${active("right")}">右</button>
@@ -1543,13 +1593,6 @@
     }
 
     function wireTag3DControls() {
-      const inlineMode = document.getElementById("inlineDepthMode");
-      if (inlineMode) {
-        inlineMode.addEventListener("change", () => {
-          el.depthModeSelect.value = inlineMode.value;
-          arrangeNotes("tag");
-        });
-      }
       el.canvas.querySelectorAll("[data-view]").forEach(button => {
         button.addEventListener("click", () => {
           tag3dView = button.dataset.view;
@@ -1560,6 +1603,93 @@
 
     function renderTags(note) {
       return note.tags.length ? note.tags.map(tag => renderTagSticker(tag, note.id)).join("") : "";
+    }
+
+    function renderMarkdownBody(note, scope) {
+      if (markdownPreview) {
+        return `<div class="markdown-preview ${scope}-text" contenteditable="true" aria-label="本文プレビュー">${markdownToHtml(note.text)}</div>`;
+      }
+      return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>`;
+    }
+
+    function wireMarkdownBody(scope, note) {
+      const preview = scope.querySelector(".markdown-preview");
+      if (preview) {
+        preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
+        return;
+      }
+      const textarea = scope.querySelector("textarea");
+      if (!textarea) return;
+      textarea.addEventListener("input", () => {
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      });
+      textarea.addEventListener("change", () => updateNoteText(note, textarea.value));
+    }
+
+    function updateNoteText(note, value) {
+      const at = now();
+      const oldText = note.lastText || "";
+      note.text = value;
+      recordTextHistory(note, oldText, note.text, at);
+      note.lastText = note.text;
+      note.updatedAt = at;
+      persist();
+      render();
+    }
+
+    function markdownToHtml(markdown) {
+      const lines = escapeHtml(markdown || "").split("\n");
+      const html = [];
+      let inList = false;
+      for (const line of lines) {
+        if (/^\s*[-*]\s+/.test(line)) {
+          if (!inList) {
+            html.push("<ul>");
+            inList = true;
+          }
+          html.push(`<li>${inlineMarkdown(line.replace(/^\s*[-*]\s+/, ""))}</li>`);
+          continue;
+        }
+        if (inList) {
+          html.push("</ul>");
+          inList = false;
+        }
+        if (/^###\s+/.test(line)) html.push(`<h3>${inlineMarkdown(line.replace(/^###\s+/, ""))}</h3>`);
+        else if (/^##\s+/.test(line)) html.push(`<h2>${inlineMarkdown(line.replace(/^##\s+/, ""))}</h2>`);
+        else if (/^#\s+/.test(line)) html.push(`<h1>${inlineMarkdown(line.replace(/^#\s+/, ""))}</h1>`);
+        else if (/^>\s+/.test(line)) html.push(`<blockquote>${inlineMarkdown(line.replace(/^>\s+/, ""))}</blockquote>`);
+        else if (line.trim()) html.push(`<p>${inlineMarkdown(line)}</p>`);
+      }
+      if (inList) html.push("</ul>");
+      return html.join("");
+    }
+
+    function inlineMarkdown(text) {
+      return text
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>")
+        .replace(/`(.+?)`/g, "<code>$1</code>");
+    }
+
+    function htmlToMarkdown(element) {
+      const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+        if (node.nodeType !== Node.ELEMENT_NODE) return "";
+        const content = Array.from(node.childNodes).map(walk).join("");
+        const tag = node.tagName.toLowerCase();
+        if (tag === "h1") return `# ${content}\n\n`;
+        if (tag === "h2") return `## ${content}\n\n`;
+        if (tag === "h3") return `### ${content}\n\n`;
+        if (tag === "strong" || tag === "b") return `**${content}**`;
+        if (tag === "em" || tag === "i") return `*${content}*`;
+        if (tag === "code") return `\`${content}\``;
+        if (tag === "blockquote") return `> ${content}\n\n`;
+        if (tag === "li") return `- ${content}\n`;
+        if (tag === "p" || tag === "div") return `${content}\n\n`;
+        return content;
+      };
+      return Array.from(element.childNodes).map(walk).join("").replace(/\n{3,}/g, "\n\n").trim();
     }
 
     function updateTags(note, value) {
@@ -1610,11 +1740,7 @@
           return 0;
         });
 
-      if (mode === "tag") {
-        arrangeTag3D(sorted);
-      } else {
-        arrangeFlat(sorted);
-      }
+      arrangeFlat(sorted);
       persist();
       render();
       if (showToast) toast("メモを整列しました");
@@ -1632,35 +1758,6 @@
       });
     }
 
-    function arrangeTag3D(sorted) {
-      const groups = new Map();
-      sorted.forEach(note => {
-        const tag = firstTag(note) || "タグなし";
-        if (!groups.has(tag)) groups.set(tag, []);
-        groups.get(tag).push(note);
-      });
-      const allTimes = sorted.map(note => new Date(note.updatedAt).getTime());
-      const maxTime = Math.max(...allTimes, Date.now());
-      const minTime = Math.min(...allTimes, maxTime);
-      const timeRange = Math.max(1, maxTime - minTime);
-      const depthMode = el.depthModeSelect.value || "even";
-      let groupIndex = 0;
-      for (const notes of groups.values()) {
-        notes.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-        notes.forEach((note, stackIndex) => {
-          note.x = 110 + groupIndex * 300 + stackIndex * 10;
-          note.y = 130 + stackIndex * 12;
-          note.w = 220;
-          note.h = 168;
-          const depth = depthMode === "time"
-            ? Math.round(((new Date(note.updatedAt).getTime() - minTime) / timeRange) * 320)
-            : (notes.length - 1 - stackIndex) * 70;
-          note.depth = depth;
-        });
-        groupIndex += 1;
-      }
-    }
-
     function render() {
       renderNotes();
       renderSidePanel();
@@ -1668,17 +1765,16 @@
 
     function renderNotes() {
       const query = el.searchInput.value.trim().toLowerCase();
-      const isTag3D = el.arrangeSelect.value === "tag";
+      const isTag3D = boardMode === "3d";
       const notes = [...state.notes]
         .filter(note => !note.parentId)
         .sort((a, b) => {
-          if (isTag3D) return firstTag(a).localeCompare(firstTag(b), "ja") || new Date(b.updatedAt) - new Date(a.updatedAt);
+          if (isTag3D) return new Date(b.updatedAt) - new Date(a.updatedAt);
           return Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt);
         })
         .filter(note => noteMatchesQuery(note, query));
 
       el.canvas.className = `canvas${isTag3D ? ` tag-3d view-${tag3dView}` : ""}`;
-      el.depthModeSelect.hidden = !isTag3D;
       el.canvas.innerHTML = renderTagShelf() + (isTag3D ? renderTag3DControls() + `<canvas class="tag3d-webgl" id="tag3dCanvas"></canvas>` : "");
       wireTagShelf();
       if (isTag3D) wireTag3DControls();
@@ -1698,7 +1794,7 @@
             <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
           </div>
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
-          <textarea aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>
+          ${renderMarkdownBody(note, "note")}
           <div class="note-body">
             <div class="tag-row">${renderTags(note)}</div>
             <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
@@ -1739,21 +1835,7 @@
           render();
         });
 
-        const textarea = card.querySelector("textarea");
-        textarea.addEventListener("input", () => {
-          textarea.style.height = "auto";
-          textarea.style.height = `${textarea.scrollHeight}px`;
-        });
-        textarea.addEventListener("change", () => {
-          const at = now();
-          const oldText = note.lastText || "";
-          note.text = textarea.value;
-          recordTextHistory(note, oldText, note.text, at);
-          note.lastText = note.text;
-          note.updatedAt = at;
-          persist();
-          render();
-        });
+        wireMarkdownBody(card, note);
 
         card.querySelector(".pin").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1824,7 +1906,7 @@
             <button class="child-move" title="親メモ内で移動">${iconMove()}</button>
             <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
           </div>
-          <textarea class="child-text" aria-label="子メモ本文" placeholder="子メモを書く">${escapeHtml(child.text)}</textarea>
+          ${renderMarkdownBody(child, "child")}
           <div class="tag-row child-tags">${renderTags(child)}</div>
           <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件 / 子 ${grandchildren.length} 件</div>
           <div class="child-actions">
@@ -1877,16 +1959,7 @@
           render();
         });
 
-        childCard.querySelector(".child-text").addEventListener("change", (event) => {
-          const at = now();
-          const oldText = child.lastText || "";
-          child.text = event.target.value;
-          recordTextHistory(child, oldText, child.text, at);
-          child.lastText = child.text;
-          child.updatedAt = at;
-          persist();
-          render();
-        });
+        wireMarkdownBody(childCard, child);
 
         childCard.querySelector(".child-select").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -2248,45 +2321,61 @@
       const canvas = document.getElementById("tag3dCanvas");
       if (!canvas) return;
       try {
-        const THREE = await import("/vendor/three/three.module.js");
+        const THREE = await import(new URL("./vendor/three/three.module.js", document.baseURI).href);
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(el.canvas.clientWidth, el.canvas.clientHeight, false);
-        renderer.setClearColor(0x111827, 1);
+        renderer.setClearColor(0xffffff, 1);
 
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x111827, 1000, 2400);
+        scene.fog = new THREE.Fog(0xffffff, 1400, 2800);
         const camera = new THREE.PerspectiveCamera(48, el.canvas.clientWidth / el.canvas.clientHeight, 1, 5000);
         setTag3DCamera(camera);
 
-        scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2.2));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xdadce0, 2.4));
         const light = new THREE.DirectionalLight(0xffffff, 1.7);
         light.position.set(260, 520, 420);
         scene.add(light);
 
-        const grid = new THREE.GridHelper(1450, 24, 0x94a3b8, 0x334155);
-        grid.position.set(420, -190, 120);
+        const grid = new THREE.GridHelper(1700, 34, 0xdadce0, 0xe8eaed);
+        grid.position.set(200, -260, 160);
         scene.add(grid);
 
-        const sorted = [...notes].sort((a, b) => firstTag(a).localeCompare(firstTag(b), "ja") || new Date(b.updatedAt) - new Date(a.updatedAt));
-        const tagColumns = new Map();
-        sorted.forEach(note => {
-          const tag = firstTag(note) || "タグなし";
-          if (!tagColumns.has(tag)) tagColumns.set(tag, tagColumns.size);
-          const tagIndex = tagColumns.get(tag);
-          const x = -520 + tagIndex * 310;
-          const z = note.depth || 0;
-          const y = 190 - z * 0.24;
-          const card = makeNote3DCard(THREE, note);
-          card.position.set(x + z * 0.2, y, z);
-          scene.add(card);
+        const events = get3DBoardEvents(notes);
+        const years = events.map(event => new Date(event.at).getFullYear());
+        const minYear = Math.min(...years, new Date().getFullYear());
+        const maxYear = Math.max(...years, minYear);
+        const yearRange = Math.max(1, maxYear - minYear);
+        const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
+
+        categories.forEach((category, index) => {
+          const x = -560 + index * 300;
+          const label = makeLabel(THREE, category, el.classifySelect.value === "tag" ? "タグ" : "色", "");
+          label.position.set(x, 330, -120);
+          scene.add(label);
         });
 
-        for (const [tag, index] of tagColumns.entries()) {
-          const label = makeLabel(THREE, tag, "タグ列", "");
-          label.position.set(-520 + index * 310, 270, -40);
+        for (let year = minYear; year <= maxYear; year++) {
+          const y = -170 + ((year - minYear) / yearRange) * 560;
+          const label = makeLabel(THREE, `${year}`, "年", "");
+          label.position.set(-720, y, -180);
           scene.add(label);
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-660, y, -160),
+            new THREE.Vector3(680, y, -160)
+          ]);
+          scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xdadce0 })));
         }
+
+        events.forEach((event, index) => {
+          const catIndex = Math.max(0, categories.indexOf(event.category));
+          const x = -560 + catIndex * 300;
+          const y = -170 + ((new Date(event.at).getFullYear() - minYear) / yearRange) * 560;
+          const z = (index % 9) * 56;
+          const card = makeEvent3DCard(THREE, event);
+          card.position.set(x, y, z);
+          scene.add(card);
+        });
 
         renderer.render(scene, camera);
         tag3dRuntime = { THREE, renderer, scene, camera };
@@ -2298,30 +2387,67 @@
 
     function setTag3DCamera(camera) {
       const positions = {
-        front: [120, 300, 1050],
-        top: [120, 1120, 80],
-        bottom: [120, -760, 720],
-        left: [-1080, 260, 360],
-        right: [1180, 260, 360]
+        front: [40, 190, 1280],
+        top: [40, 1180, 120],
+        bottom: [40, -820, 940],
+        left: [-1180, 190, 420],
+        right: [1180, 190, 420]
       };
       const [x, y, z] = positions[tag3dView] || positions.front;
       camera.position.set(x, y, z);
-      camera.lookAt(140, 70, 120);
+      camera.lookAt(0, 70, 120);
     }
 
-    function makeNote3DCard(THREE, note) {
+    function get3DBoardEvents(notes) {
+      const granularity = el.granularitySelect.value;
+      return notes.flatMap(note => {
+        const category = el.classifySelect.value === "tag" ? (firstTag(note) || "タグなし") : colorName(note.color);
+        return note.history
+          .filter(event => {
+            if (granularity === "all") return true;
+            if (granularity === "note") return event.type === "create" || event.type === "full";
+            return event.type === granularity;
+          })
+          .map(event => ({
+            ...event,
+            noteTitle: note.title,
+            category,
+            color: note.color,
+            preview: event.value || note.text
+          }));
+      }).sort((a, b) => new Date(b.at) - new Date(a.at));
+    }
+
+    function colorName(color) {
+      const entries = [
+        ["#fff8c7", "黄"],
+        ["#d7f0ff", "青"],
+        ["#e2f4d7", "緑"],
+        ["#fce3ef", "桃"],
+        ["#e8e0ff", "紫"],
+        ["#ffe3c2", "橙"],
+        ["#dff3ec", "青緑"]
+      ];
+      return entries.find(([value]) => value.toLowerCase() === String(color).toLowerCase())?.[1] || "その他";
+    }
+
+    function makeEvent3DCard(THREE, event) {
       const group = new THREE.Group();
-      const geometry = new THREE.BoxGeometry(220, 156, 18);
+      const geometry = new THREE.BoxGeometry(190, 78, 12);
       const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(note.color || "#fff8c7"),
-        roughness: .62,
+        color: new THREE.Color(event.color || "#fff8c7"),
+        roughness: .58,
         metalness: .03
       });
       const mesh = new THREE.Mesh(geometry, material);
       group.add(mesh);
 
-      const label = makeCardTextureLabel(THREE, note);
-      label.position.set(0, 0, 10);
+      const label = makeCardTextureLabel(THREE, {
+        title: `${typeLabel[event.type] || event.type}: ${event.noteTitle}`,
+        text: `${formatDate(event.at)} ${event.preview || ""}`,
+        tags: [event.category]
+      });
+      label.position.set(0, 0, 8);
       group.add(label);
 
       return group;
@@ -2346,7 +2472,7 @@
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
       const sprite = new THREE.Sprite(material);
-      sprite.scale.set(210, 148, 1);
+      sprite.scale.set(182, 70, 1);
       return sprite;
     }
 
@@ -2384,8 +2510,8 @@
     async function initTimeline() {
       if (threeRuntime) return;
       try {
-        const THREE = await import("/vendor/three/three.module.js");
-        const { OrbitControls } = await import("/vendor/three/examples/jsm/controls/OrbitControls.js");
+        const THREE = await import(new URL("./vendor/three/three.module.js", document.baseURI).href);
+        const { OrbitControls } = await import(new URL("./vendor/three/examples/jsm/controls/OrbitControls.js", document.baseURI).href);
         const renderer = new THREE.WebGLRenderer({ canvas: el.timeline3d, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setClearColor(0x111827, 1);
