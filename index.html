@@ -32,6 +32,7 @@
       background-size: auto, 22px 22px;
       color: var(--ink);
       overflow: hidden;
+      font-size: 13px;
     }
 
     button, input, textarea, select {
@@ -51,6 +52,7 @@
       cursor: pointer;
       transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
       white-space: nowrap;
+      font-size: 13px;
     }
 
     button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(60,64,67,.16); }
@@ -63,6 +65,15 @@
       height: 100vh;
       display: grid;
       grid-template-rows: 58px 1fr;
+    }
+
+    .app.side-collapsed .main {
+      grid-template-columns: 1fr 0;
+    }
+
+    .app.side-collapsed .side {
+      transform: translateX(100%);
+      pointer-events: none;
     }
 
     .topbar {
@@ -82,7 +93,7 @@
       gap: 10px;
       min-width: 210px;
       font-weight: 720;
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .brand-mark {
@@ -167,6 +178,69 @@
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
     }
 
+    .tag-shelf {
+      position: sticky;
+      top: 10px;
+      left: 10px;
+      z-index: 15;
+      width: fit-content;
+      max-width: min(920px, calc(100vw - 420px));
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+      padding: 8px;
+      border: 1px solid rgba(218,220,224,.9);
+      border-radius: 22px;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 6px 18px rgba(60,64,67,.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .tag-create {
+      width: 116px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0 9px;
+      outline: none;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .tag-sticker {
+      min-height: 28px;
+      height: auto;
+      border-radius: 999px;
+      padding: 5px 10px;
+      border: 1px solid rgba(60,64,67,.16);
+      background: #fef7e0;
+      color: #5f4700;
+      box-shadow: 0 2px 6px rgba(60,64,67,.12);
+      font-size: 12px;
+      font-weight: 740;
+      cursor: grab;
+      max-width: 170px;
+      overflow-wrap: anywhere;
+    }
+
+    .tag-sticker.attached {
+      min-height: 22px;
+      padding: 3px 8px;
+      font-size: 11px;
+      background: rgba(255,255,255,.74);
+      color: var(--ink);
+    }
+
+    .tag-sticker.dragging {
+      opacity: .55;
+    }
+
+    .note.drop-target {
+      outline: 3px solid rgba(26,115,232,.32);
+      outline-offset: 3px;
+    }
+
     .note {
       position: absolute;
       width: 260px;
@@ -230,18 +304,19 @@
       font-weight: 760;
       color: var(--ink);
       outline: none;
+      font-size: 13px;
     }
 
     .note-meta {
       color: rgba(32,33,36,.65);
-      font-size: 11px;
-      line-height: 1.3;
+      font-size: 10px;
+      line-height: 1.18;
     }
 
     .tag-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       flex-wrap: wrap;
     }
 
@@ -265,7 +340,7 @@
       padding: 2px 7px;
       background: rgba(32,33,36,.08);
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 680;
       max-width: 100%;
       overflow-wrap: anywhere;
@@ -279,7 +354,8 @@
       resize: none;
       background: transparent;
       color: var(--ink);
-      line-height: 1.45;
+      line-height: 1.22;
+      font-size: 12px;
     }
 
     .note-images {
@@ -376,21 +452,21 @@
     }
 
     .child-note input {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 760;
     }
 
     .child-note textarea {
       min-height: 34px;
-      font-size: 12px;
-      line-height: 1.35;
+      font-size: 11px;
+      line-height: 1.2;
       resize: vertical;
     }
 
     .child-meta {
       color: var(--muted);
       font-size: 10px;
-      line-height: 1.3;
+      line-height: 1.12;
     }
 
     .child-actions {
@@ -432,43 +508,53 @@
       overflow: hidden;
       display: grid;
       grid-template-rows: auto 1fr;
+      transition: transform .22s ease;
     }
 
     .side-head {
-      padding: 18px 18px 12px;
+      padding: 12px 14px 10px;
       border-bottom: 1px solid var(--line);
     }
 
+    .side-head-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
     .side-head h2 {
-      margin: 0 0 8px;
-      font-size: 18px;
+      margin: 0;
+      font-size: 15px;
       letter-spacing: 0;
     }
 
     .side-head p {
       margin: 0;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 11px;
+      line-height: 1.22;
     }
 
     .tabs {
       display: flex;
       gap: 8px;
-      padding: 12px 18px 0;
+      padding: 10px 14px 0;
     }
 
     .tabs button {
       flex: 1;
       justify-content: center;
-      height: 34px;
+      height: 30px;
       border-radius: 17px;
+      font-size: 12px;
     }
 
     .panel {
       min-height: 0;
       overflow: auto;
-      padding: 16px 18px 20px;
+      padding: 12px 14px 18px;
     }
 
     .history-list {
@@ -489,7 +575,7 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 6px;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .pill {
@@ -514,8 +600,8 @@
 
     .event-body {
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
+      font-size: 11px;
+      line-height: 1.22;
       white-space: pre-wrap;
       word-break: break-word;
       max-height: 88px;
@@ -524,14 +610,14 @@
 
     .tree-list {
       display: grid;
-      gap: 8px;
-      font-size: 13px;
-      line-height: 1.45;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.22;
     }
 
     .tree-item {
       border-left: 2px solid var(--line);
-      padding: 7px 0 7px 12px;
+      padding: 5px 0 5px 10px;
       background: linear-gradient(90deg, rgba(241,243,244,.72), transparent);
     }
 
@@ -717,6 +803,8 @@
       .main { grid-template-columns: 1fr; }
       .board-shell { min-height: 68vh; }
       .side { border-left: 0; border-top: 1px solid var(--line); min-height: 420px; }
+      .app.side-collapsed .side { display: none; }
+      .tag-shelf { max-width: calc(100vw - 56px); }
       .timeline { inset: 0; }
       .timeline-bar { flex-wrap: wrap; height: auto; align-items: start; }
       .timeline-help { width: 100%; margin-left: 0; }
@@ -724,7 +812,7 @@
   </style>
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="app">
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">
@@ -753,9 +841,17 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           新規
         </button>
+        <button id="importKeepBtn" title="Google Keepを取り込み">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Keep取込
+        </button>
         <button id="historyBtn" title="履歴">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           履歴
+        </button>
+        <button id="toggleSideBtn" title="履歴パネル">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM15 5v14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          パネル
         </button>
         <button id="timelineBtn" title="3D年表">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18 12 6l8 12M4 18h16M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -773,7 +869,12 @@
 
       <aside class="side" id="sidePanel">
         <div class="side-head">
-          <h2 id="sideTitle">履歴</h2>
+          <div class="side-head-top">
+            <h2 id="sideTitle">履歴</h2>
+            <button id="closeSideBtn" class="icon" title="履歴パネルを閉じる">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
           <p id="sideSummary">メモを選ぶと、作成、本文全体、段落、言葉単位の更新履歴を確認できます。</p>
         </div>
         <div class="tabs">
@@ -805,6 +906,7 @@
   </section>
 
   <input id="imageInput" class="hidden-file" type="file" accept="image/*" multiple>
+  <input id="keepImportInput" class="hidden-file" type="file" webkitdirectory directory multiple>
   <section class="image-modal" id="imageModal" aria-label="画像プレビュー">
     <div class="image-dialog">
       <div class="image-dialog-head">
@@ -827,14 +929,20 @@
     let selectedId = state.selectedId || state.notes[0]?.id || null;
     let historyMode = "selected";
     let drag = null;
+    let tagDrag = null;
     let imageTargetId = null;
     let threeRuntime = null;
 
     const el = {
+      app: document.getElementById("app"),
       canvas: document.getElementById("canvas"),
       arrangeSelect: document.getElementById("arrangeSelect"),
       addNote: document.getElementById("addNote"),
+      importKeepBtn: document.getElementById("importKeepBtn"),
+      keepImportInput: document.getElementById("keepImportInput"),
       historyBtn: document.getElementById("historyBtn"),
+      toggleSideBtn: document.getElementById("toggleSideBtn"),
+      closeSideBtn: document.getElementById("closeSideBtn"),
       timelineBtn: document.getElementById("timelineBtn"),
       historyList: document.getElementById("historyList"),
       tabSelected: document.getElementById("tabSelected"),
@@ -875,6 +983,14 @@
 
     render();
 
+    el.toggleSideBtn.addEventListener("click", () => {
+      el.app.classList.toggle("side-collapsed");
+    });
+
+    el.closeSideBtn.addEventListener("click", () => {
+      el.app.classList.add("side-collapsed");
+    });
+
     el.arrangeSelect.addEventListener("change", () => {
       if (el.arrangeSelect.value !== "manual") {
         arrangeNotes(el.arrangeSelect.value);
@@ -895,7 +1011,28 @@
       toast("新しいメモを作成しました");
     });
 
+    el.importKeepBtn.addEventListener("click", () => {
+      el.keepImportInput.click();
+    });
+
+    el.keepImportInput.addEventListener("change", async () => {
+      const files = Array.from(el.keepImportInput.files || []);
+      if (files.length === 0) return;
+      try {
+        const imported = await importGoogleKeepFiles(files);
+        persist();
+        render();
+        toast(`${imported} 件のKeepメモを取り込みました`);
+      } catch (error) {
+        console.error(error);
+        toast("Keepの取り込みに失敗しました");
+      } finally {
+        el.keepImportInput.value = "";
+      }
+    });
+
     el.historyBtn.addEventListener("click", () => {
+      el.app.classList.remove("side-collapsed");
       historyMode = "selected";
       el.tabSelected.classList.add("active");
       el.tabAll.classList.remove("active");
@@ -993,12 +1130,13 @@
     function loadState() {
       try {
         const raw = localStorage.getItem(STORE_KEY);
-        if (!raw) return { notes: [], selectedId: null };
+        if (!raw) return { notes: [], selectedId: null, tags: [] };
         const parsed = JSON.parse(raw);
         const notes = Array.isArray(parsed.notes) ? parsed.notes.map(normalizeNote) : [];
-        return { notes, selectedId: parsed.selectedId || null };
+        const tags = Array.isArray(parsed.tags) ? parsed.tags : uniqueTags(notes);
+        return { notes, selectedId: parsed.selectedId || null, tags };
       } catch {
-        return { notes: [], selectedId: null };
+        return { notes: [], selectedId: null, tags: [] };
       }
     }
 
@@ -1020,6 +1158,7 @@
 
     function persist() {
       state.selectedId = selectedId;
+      state.tags = uniqueTags(state.notes, state.tags);
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
     }
 
@@ -1087,6 +1226,109 @@
       persist();
       render();
       toast("子メモを貼り込みました");
+    }
+
+    async function importGoogleKeepFiles(files) {
+      const jsonFiles = files.filter(file => file.name.toLowerCase().endsWith(".json"));
+      const imageFiles = new Map(
+        files
+          .filter(file => file.type.startsWith("image/"))
+          .map(file => [file.name, file])
+      );
+      let imported = 0;
+
+      for (const file of jsonFiles) {
+        const data = JSON.parse(await file.text());
+        const note = googleKeepToNote(data, imported);
+        note.images = await importKeepImages(data, imageFiles);
+        state.notes.unshift(note);
+        imported += 1;
+      }
+
+      selectedId = state.notes[0]?.id || selectedId;
+      arrangeNotes("updated", false);
+      return imported;
+    }
+
+    function googleKeepToNote(data, index) {
+      const createdAt = keepTimestamp(data.createdTimestampUsec || data.createdTimestampMillis || data.createdAt);
+      const updatedAt = keepTimestamp(data.userEditedTimestampUsec || data.updatedTimestampUsec || data.updatedAt) || createdAt;
+      const title = data.title || "Google Keepメモ";
+      const listText = Array.isArray(data.listContent)
+        ? data.listContent.map(item => `${item.isChecked ? "[x]" : "[ ]"} ${item.text || ""}`).join("\n")
+        : "";
+      const text = [data.textContent || "", listText].filter(Boolean).join("\n");
+      const note = {
+        id: uid(),
+        parentId: null,
+        title,
+        text,
+        images: [],
+        tags: keepLabels(data),
+        collapsed: false,
+        x: 90 + (index % 4) * 310,
+        y: 90 + Math.floor(index / 4) * 240,
+        localX: 8,
+        localY: 8,
+        w: 280,
+        h: 210,
+        color: keepColor(data.color),
+        pinned: Boolean(data.isPinned),
+        createdAt,
+        updatedAt,
+        history: [],
+        lastText: text
+      };
+      recordEvent(note, "create", "Google Keepから取込", title, createdAt);
+      recordTextHistory(note, "", text, updatedAt);
+      if (note.tags.length) recordEvent(note, "full", "Keepラベル取込", note.tags.join(", "), updatedAt);
+      return note;
+    }
+
+    async function importKeepImages(data, imageFiles) {
+      const attachments = Array.isArray(data.attachments) ? data.attachments : [];
+      const images = [];
+      for (const attachment of attachments) {
+        const path = attachment.filePath || attachment.file_path || attachment.name || "";
+        const filename = path.split(/[\\/]/).pop();
+        const file = imageFiles.get(filename);
+        if (file) images.push(await readFileAsDataURL(file));
+      }
+      return images;
+    }
+
+    function keepLabels(data) {
+      if (!Array.isArray(data.labels)) return [];
+      return data.labels
+        .map(label => typeof label === "string" ? label : label.name)
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    function keepTimestamp(value) {
+      if (!value) return now();
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        const millis = num > 9999999999999 ? Math.floor(num / 1000) : num;
+        return new Date(millis).toISOString();
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? now() : parsed.toISOString();
+    }
+
+    function keepColor(color) {
+      const map = {
+        DEFAULT: palette[0],
+        WHITE: "#fff8c7",
+        RED: "#fce3ef",
+        ORANGE: "#ffe3c2",
+        YELLOW: "#fff8c7",
+        GREEN: "#e2f4d7",
+        TEAL: "#dff3ec",
+        BLUE: "#d7f0ff",
+        GRAY: "#f1f3f4"
+      };
+      return map[String(color || "DEFAULT").toUpperCase()] || palette[0];
     }
 
     function recordEvent(note, type, label, value, at = now()) {
@@ -1171,8 +1413,28 @@
       return (note.tags?.[0] || "").toLowerCase();
     }
 
+    function uniqueTags(notes = state.notes, extra = []) {
+      return [...new Set([...extra, ...notes.flatMap(note => note.tags || [])].filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+    }
+
+    function renderTagShelf() {
+      const tags = uniqueTags(state.notes, state.tags);
+      return `
+        <div class="tag-shelf" data-tag-shelf="true">
+          <input class="tag-create" id="tagCreateInput" placeholder="タグ追加">
+          <button class="icon" id="tagCreateBtn" title="タグ追加">${iconPlus()}</button>
+          ${tags.map(tag => renderTagSticker(tag)).join("")}
+        </div>
+      `;
+    }
+
+    function renderTagSticker(tag, noteId = "") {
+      const source = noteId ? `data-source-note="${noteId}"` : "";
+      return `<button class="tag-sticker${noteId ? " attached" : ""}" draggable="true" data-tag="${escapeAttr(tag)}" ${source}>${escapeHtml(tag)}</button>`;
+    }
+
     function renderTags(note) {
-      return note.tags.length ? note.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("") : "";
+      return note.tags.length ? note.tags.map(tag => renderTagSticker(tag, note.id)).join("") : "";
     }
 
     function updateTags(note, value) {
@@ -1185,7 +1447,35 @@
       render();
     }
 
-    function arrangeNotes(mode) {
+    function addGlobalTag(tag) {
+      const value = tag.trim();
+      if (!value) return;
+      state.tags = uniqueTags(state.notes, [...state.tags, value]);
+      persist();
+      render();
+      toast("タグを追加しました");
+    }
+
+    function addTagToNote(note, tag) {
+      if (!note || !tag || note.tags.includes(tag)) return;
+      note.tags.push(tag);
+      state.tags = uniqueTags(state.notes, [...state.tags, tag]);
+      note.updatedAt = now();
+      recordEvent(note, "full", "タグ貼り付け", tag);
+      persist();
+      render();
+    }
+
+    function removeTagFromNote(note, tag) {
+      if (!note || !tag || !note.tags.includes(tag)) return;
+      note.tags = note.tags.filter(item => item !== tag);
+      note.updatedAt = now();
+      recordEvent(note, "full", "タグ取り外し", tag);
+      persist();
+      render();
+    }
+
+    function arrangeNotes(mode, showToast = true) {
       const sorted = state.notes
         .filter(note => !note.parentId)
         .sort((a, b) => {
@@ -1207,7 +1497,7 @@
       });
       persist();
       render();
-      toast("メモを整列しました");
+      if (showToast) toast("メモを整列しました");
     }
 
     function render() {
@@ -1222,7 +1512,8 @@
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt))
         .filter(note => noteMatchesQuery(note, query));
 
-      el.canvas.innerHTML = "";
+      el.canvas.innerHTML = renderTagShelf();
+      wireTagShelf();
       notes.forEach(note => {
         const children = childNotes(note.id);
         const card = document.createElement("article");
@@ -1240,7 +1531,7 @@
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
           <textarea aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>
           <div class="note-body">
-            <div class="tag-row">${renderTags(note)}<input class="tag-input" value="${escapeAttr(note.tags.join(", "))}" placeholder="タグ"></div>
+            <div class="tag-row">${renderTags(note)}</div>
             <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
             <div class="child-notes" style="--child-area-height:${childAreaHeight(children)}px">${children.map(child => renderChildNote(child)).join("")}</div>
             <div class="note-actions">
@@ -1265,9 +1556,10 @@
         const head = card.querySelector(".note-head");
         head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
         card.addEventListener("dblclick", (event) => {
-          if (event.target.closest("button,textarea,.tag-input")) return;
+          if (event.target.closest("button,textarea")) return;
           toggleCollapsed(note);
         });
+        wireNoteTagDrop(card, note);
 
         const title = card.querySelector(".note-title");
         title.addEventListener("change", () => {
@@ -1293,8 +1585,6 @@
           persist();
           render();
         });
-
-        wireTagInput(card.querySelector(".tag-input"), note);
 
         card.querySelector(".pin").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1349,6 +1639,7 @@
 
         el.canvas.appendChild(card);
       });
+      wireTagStickers(el.canvas);
     }
 
     function renderChildNote(child) {
@@ -1360,7 +1651,7 @@
             <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
           </div>
           <textarea class="child-text" aria-label="子メモ本文" placeholder="子メモを書く">${escapeHtml(child.text)}</textarea>
-          <div class="tag-row child-tags">${renderTags(child)}<input class="tag-input child-tag-input" value="${escapeAttr(child.tags.join(", "))}" placeholder="タグ"></div>
+          <div class="tag-row child-tags">${renderTags(child)}</div>
           <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件 / 子 ${grandchildren.length} 件</div>
           <div class="child-actions">
             <span>
@@ -1389,10 +1680,11 @@
         });
 
         childCard.addEventListener("dblclick", (event) => {
-          if (event.target.closest("button,textarea,.child-tag-input")) return;
+          if (event.target.closest("button,textarea")) return;
           event.stopPropagation();
           toggleCollapsed(child);
         });
+        wireNoteTagDrop(childCard, child);
 
         childCard.querySelector(".child-head").addEventListener("pointerdown", (event) => {
           if (event.target.closest("input")) return;
@@ -1421,8 +1713,6 @@
           persist();
           render();
         });
-
-        wireTagInput(childCard.querySelector(".child-tag-input"), child);
 
         childCard.querySelector(".child-select").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1464,16 +1754,76 @@
       }
     }
 
-    function wireTagInput(input, note) {
-      const commit = () => updateTags(note, input.value);
-      input.addEventListener("change", commit);
-      input.addEventListener("blur", commit);
+    function wireTagShelf() {
+      const input = document.getElementById("tagCreateInput");
+      const button = document.getElementById("tagCreateBtn");
+      if (!input || !button) return;
+      const commit = () => {
+        addGlobalTag(input.value);
+        input.value = "";
+      };
+      button.addEventListener("click", commit);
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           commit();
-          input.blur();
         }
+      });
+      if (el.canvas.dataset.tagDropWired === "true") return;
+      el.canvas.dataset.tagDropWired = "true";
+      el.canvas.addEventListener("dragover", (event) => event.preventDefault());
+      el.canvas.addEventListener("drop", (event) => {
+        event.preventDefault();
+        if (tagDrag?.sourceNoteId && !event.target.closest(".note,.child-note")) {
+          removeTagFromNote(findNote(tagDrag.sourceNoteId), tagDrag.tag);
+        }
+      });
+    }
+
+    function wireTagStickers(scope) {
+      scope.querySelectorAll(".tag-sticker").forEach(sticker => {
+        sticker.addEventListener("dragstart", (event) => {
+          tagDrag = {
+            tag: sticker.dataset.tag,
+            sourceNoteId: sticker.dataset.sourceNote || "",
+            droppedOnNote: false
+          };
+          sticker.classList.add("dragging");
+          event.dataTransfer.effectAllowed = "copyMove";
+          event.dataTransfer.setData("text/plain", tagDrag.tag);
+        });
+        sticker.addEventListener("dragend", (event) => {
+          sticker.classList.remove("dragging");
+          if (tagDrag?.sourceNoteId && !tagDrag.droppedOnNote) {
+            const target = document.elementFromPoint(event.clientX, event.clientY);
+            if (!target?.closest(".note,.child-note")) {
+              removeTagFromNote(findNote(tagDrag.sourceNoteId), tagDrag.tag);
+            }
+          }
+          tagDrag = null;
+        });
+      });
+    }
+
+    function wireNoteTagDrop(card, note) {
+      card.addEventListener("dragover", (event) => {
+        if (!tagDrag) return;
+        event.preventDefault();
+        card.classList.add("drop-target");
+      });
+      card.addEventListener("dragleave", (event) => {
+        if (!card.contains(event.relatedTarget)) card.classList.remove("drop-target");
+      });
+      card.addEventListener("drop", (event) => {
+        if (!tagDrag) return;
+        event.preventDefault();
+        event.stopPropagation();
+        card.classList.remove("drop-target");
+        tagDrag.droppedOnNote = true;
+        if (tagDrag.sourceNoteId && tagDrag.sourceNoteId !== note.id) {
+          removeTagFromNote(findNote(tagDrag.sourceNoteId), tagDrag.tag);
+        }
+        addTagToNote(note, tagDrag.tag);
       });
     }
 
@@ -1735,8 +2085,8 @@
     async function initTimeline() {
       if (threeRuntime) return;
       try {
-        const THREE = await import("./vendor/three/three.module.js");
-        const { OrbitControls } = await import("./vendor/three/examples/jsm/controls/OrbitControls.js");
+        const THREE = await import("/vendor/three/three.module.js");
+        const { OrbitControls } = await import("/vendor/three/examples/jsm/controls/OrbitControls.js");
         const renderer = new THREE.WebGLRenderer({ canvas: el.timeline3d, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setClearColor(0x111827, 1);
@@ -1755,10 +2105,8 @@
         window.addEventListener("resize", resizeTimeline);
         animateTimeline();
       } catch (error) {
-        el.timeline3d.replaceWith(Object.assign(document.createElement("div"), {
-          className: "empty",
-          textContent: "Three.jsを読み込めませんでした。ネットワーク接続がある状態で再度開いてください。"
-        }));
+        console.error(error);
+        toast("3D年表の読み込みに失敗しました");
       }
     }
 
@@ -1973,6 +2321,9 @@
     }
     function iconMove() {
       return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3 8 7M12 3l4 4M12 21l-4-4M12 21l4-4M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconPlus() {
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
     }
     function iconTrash() {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
