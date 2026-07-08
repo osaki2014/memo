@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chrono Keep Board</title>
+  <title>memo</title>
   <style>
     :root {
       color-scheme: light;
@@ -18,7 +18,7 @@
       --warn: #fbbc04;
       --rose: #d93025;
       --shadow: 0 12px 28px rgba(60, 64, 67, .16);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "Avenir Next", "IBM Plex Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     * { box-sizing: border-box; }
@@ -33,6 +33,7 @@
       color: var(--ink);
       overflow: hidden;
       font-size: 13px;
+      font-family: "Avenir Next", "IBM Plex Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     button, input, textarea, select {
@@ -266,10 +267,10 @@
 
     .view-cube {
       position: relative;
-      width: 96px;
-      height: 96px;
+      width: 106px;
+      height: 106px;
       border-radius: 10px;
-      perspective: 420px;
+      perspective: 520px;
       background: transparent;
       box-shadow: none;
       transform-style: preserve-3d;
@@ -281,51 +282,53 @@
       cursor: grabbing;
     }
 
-    .view-cube button {
+    .view-cube-shell button {
       position: absolute;
-      left: 28px;
-      top: 28px;
-      width: 40px;
-      height: 40px;
+      left: 18px;
+      top: 18px;
+      width: 54px;
+      height: 54px;
       min-width: 0;
       padding: 0;
-      border-radius: 2px;
+      border-radius: 3px;
       justify-content: center;
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 760;
       background: rgba(255,255,255,.92);
-      border: 1px solid rgba(189,193,198,.9);
+      border: 1px solid rgba(130,137,143,.95);
       color: #3c4043;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.6);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 8px 16px rgba(0,0,0,.12);
       transform-style: preserve-3d;
+      backface-visibility: visible;
+      pointer-events: auto;
     }
 
-    .view-cube button[data-view="top"] {
-      transform: rotateX(90deg) translateZ(20px);
+    .view-cube-shell button[data-view="top"] {
+      transform: rotateX(90deg) translateZ(27px);
     }
 
-    .view-cube button[data-view="left"] {
-      transform: rotateY(-90deg) translateZ(20px);
+    .view-cube-shell button[data-view="left"] {
+      transform: rotateY(-90deg) translateZ(27px);
     }
 
-    .view-cube button[data-view="front"] {
+    .view-cube-shell button[data-view="front"] {
       z-index: 2;
-      transform: translateZ(20px);
+      transform: translateZ(27px);
     }
 
-    .view-cube button[data-view="right"] {
-      transform: rotateY(90deg) translateZ(20px);
+    .view-cube-shell button[data-view="right"] {
+      transform: rotateY(90deg) translateZ(27px);
     }
 
-    .view-cube button[data-view="bottom"] {
-      transform: rotateX(-90deg) translateZ(20px);
+    .view-cube-shell button[data-view="bottom"] {
+      transform: rotateX(-90deg) translateZ(27px);
     }
 
-    .view-cube button[data-view="back"] {
-      transform: rotateY(180deg) translateZ(20px);
+    .view-cube-shell button[data-view="back"] {
+      transform: rotateY(180deg) translateZ(27px);
     }
 
-    .view-cube button.active {
+    .view-cube-shell button.active {
       background: linear-gradient(145deg, #5f9bff, #1a73e8);
       color: #fff;
       border-color: var(--accent);
@@ -334,10 +337,39 @@
 
     .view-cube-shell {
       position: absolute;
-      inset: 18px;
+      left: 8px;
+      top: 8px;
+      width: 90px;
+      height: 90px;
       transform-style: preserve-3d;
       transform: rotateX(-26deg) rotateY(38deg);
     }
+
+    .cube-hit {
+      position: absolute;
+      z-index: 5;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 4px;
+      background: rgba(26,115,232,0);
+      box-shadow: none !important;
+      color: transparent;
+      transform: none !important;
+    }
+
+    .cube-hit:hover {
+      background: rgba(26,115,232,.12);
+      transform: none;
+    }
+
+    .cube-hit[data-hit-view="top"] { left: 28px; top: 4px; width: 52px; height: 30px; }
+    .cube-hit[data-hit-view="bottom"] { left: 28px; bottom: 4px; width: 52px; height: 30px; }
+    .cube-hit[data-hit-view="left"] { left: 2px; top: 34px; width: 34px; height: 48px; }
+    .cube-hit[data-hit-view="right"] { right: 2px; top: 34px; width: 34px; height: 48px; }
+    .cube-hit[data-hit-view="front"] { left: 39px; top: 39px; width: 34px; height: 34px; }
+    .cube-hit[data-hit-view="back"] { right: 22px; top: 22px; width: 30px; height: 30px; }
 
     .tag-shelf {
       position: sticky;
@@ -422,40 +454,45 @@
       display: grid;
       grid-template-rows: auto auto auto minmax(0, 1fr);
       gap: 8px;
-      resize: both;
+      resize: none;
       overflow: hidden;
       cursor: default;
     }
 
     .note-resize {
       position: absolute;
-      right: 3px;
-      bottom: 3px;
-      width: 18px;
-      height: 18px;
+      right: 0;
+      bottom: 0;
+      width: 34px;
+      height: 34px;
       border: 0;
       padding: 0;
       background: transparent;
       cursor: nwse-resize;
-      z-index: 5;
+      pointer-events: auto;
+      user-select: none;
+      z-index: 30;
+      touch-action: none;
+      transform: none !important;
+      box-shadow: none !important;
     }
 
     .note-resize::before,
     .note-resize::after {
       content: "";
       position: absolute;
-      right: 2px;
-      bottom: 3px;
-      width: 12px;
+      right: 7px;
+      bottom: 8px;
+      width: 15px;
       border-bottom: 1px solid rgba(60,64,67,.48);
       transform: rotate(-45deg);
       transform-origin: right bottom;
     }
 
     .note-resize::after {
-      right: 2px;
-      bottom: 8px;
-      width: 8px;
+      right: 7px;
+      bottom: 14px;
+      width: 10px;
     }
 
     .note.edge-drag {
@@ -485,18 +522,6 @@
     .note.dragging {
       z-index: 20;
       opacity: .96;
-    }
-
-    .note.pinned::before {
-      content: "";
-      position: absolute;
-      top: 8px;
-      right: 10px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--rose);
-      box-shadow: 0 0 0 2px rgba(255,255,255,.65);
     }
 
     .note-head {
@@ -573,20 +598,24 @@
       overflow-wrap: anywhere;
     }
 
-    .note textarea {
+    .note textarea,
+    .markdown-preview {
       width: 100%;
       min-height: 56px;
-      max-height: 128px;
+      max-width: 100%;
+      max-height: var(--text-max-height, 150px);
       border: 1px solid transparent;
       border-radius: 6px;
       outline: none;
-      resize: horizontal;
+      resize: both;
       background: transparent;
       color: var(--ink);
       line-height: 1.22;
       font-size: var(--note-font-size, 12px);
       font-family: var(--note-font-family, system-ui, sans-serif);
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      box-sizing: border-box;
     }
 
     .note textarea:hover,
@@ -634,15 +663,16 @@
 
     .child-note {
       position: absolute;
-      width: 190px;
-      min-height: 132px;
-      border: 1px solid rgba(60,64,67,.18);
-      border-left: 4px solid var(--accent-2);
+      width: 230px;
+      min-height: 150px;
+      border: 2px solid transparent;
       border-radius: 7px;
       background: rgba(255,255,255,.58);
-      padding: 7px;
+      padding: 10px;
       display: grid;
-      gap: 5px;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 7px;
+      overflow: hidden;
     }
 
     .child-note.collapsed {
@@ -678,9 +708,9 @@
     }
 
     .child-note input,
-    .child-note textarea {
+    .child-note textarea,
+    .child-note .markdown-preview {
       width: 100%;
-      border: 0;
       background: transparent;
       outline: none;
       color: var(--ink);
@@ -692,23 +722,11 @@
     }
 
     .child-note textarea {
-      min-height: 34px;
-      max-height: 72px;
-      font-size: var(--note-font-size, 11px);
-      font-family: var(--note-font-family, system-ui, sans-serif);
-      line-height: 1.2;
-      resize: horizontal;
-      overflow: auto;
-      border: 1px solid transparent;
-      border-radius: 5px;
+      min-height: 46px;
     }
 
     .child-note .markdown-preview {
-      min-height: 34px;
-      max-height: 72px;
-      font-size: var(--note-font-size, 11px);
-      font-family: var(--note-font-family, system-ui, sans-serif);
-      line-height: 1.2;
+      min-height: 46px;
     }
 
     .child-meta {
@@ -1141,7 +1159,7 @@
   </style>
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app side-collapsed" id="app">
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">
@@ -1151,7 +1169,7 @@
             <path d="M9 11h6M9 15h5" stroke="#202124" stroke-width="1.7" stroke-linecap="round"/>
           </svg>
         </div>
-        Chrono Keep Board
+        memo
       </div>
       <label class="search" aria-label="検索">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1277,6 +1295,7 @@
     let textMenuEl = null;
     let moveCommand = null;
     let viewCubeDrag = null;
+    let skipAutoResolveOnce = false;
 
     const el = {
       app: document.getElementById("app"),
@@ -1554,7 +1573,8 @@
         h: note.h || 188,
         textSize: note.textSize || "",
         textFont: note.textFont || "",
-        textWidth: note.textWidth || ""
+        textWidth: note.textWidth || "",
+        textHeight: note.textHeight || ""
       };
     }
 
@@ -1586,10 +1606,9 @@
         y: seed.y ?? 80,
         localX: seed.localX ?? 8,
         localY: seed.localY ?? 8,
-        w: 260,
-        h: 188,
+        w: seed.w || (seed.parentId ? 230 : 260),
+        h: seed.h || (seed.parentId ? 160 : 188),
         color: seed.color || palette[0],
-        pinned: false,
         createdAt,
         updatedAt: createdAt,
         history: [],
@@ -1679,7 +1698,6 @@
         w: 280,
         h: 210,
         color: keepColor(data.color),
-        pinned: Boolean(data.isPinned),
         createdAt,
         updatedAt,
         history: [],
@@ -1852,6 +1870,7 @@
               <button data-view="top" class="${active("top")}">上</button>
               <button data-view="bottom" class="${active("bottom")}">下</button>
             </div>
+            ${["top", "bottom", "left", "right", "front", "back"].map(view => `<button class="cube-hit${active(view)}" data-hit-view="${view}" aria-label="${view}"></button>`).join("")}
           </div>
         </div>
       `;
@@ -1867,12 +1886,20 @@
       const shell = el.canvas.querySelector(".view-cube-shell");
       if (!cube || !shell) return;
       cube.addEventListener("click", (event) => {
+        const face = event.target.closest("[data-view],[data-hit-view]");
+        if (face) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          setTag3DView(face.dataset.view || face.dataset.hitView);
+          return;
+        }
         if (viewCubeDrag) return;
         const view = viewFromCubePoint(cube, event.clientX, event.clientY);
         if (view) setTag3DView(view);
       }, true);
       cube.addEventListener("pointerdown", (event) => {
-        if (event.target.closest("[data-view]")) return;
+        if (event.target.closest("[data-view],[data-hit-view]")) return;
         event.preventDefault();
         cube.setPointerCapture(event.pointerId);
         cube.classList.add("dragging");
@@ -1903,7 +1930,9 @@
 
     function setTag3DView(view) {
       tag3dView = view || "front";
+      el.canvas.className = `canvas tag-3d view-${tag3dView}`;
       el.canvas.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === tag3dView));
+      el.canvas.querySelectorAll("[data-hit-view]").forEach(item => item.classList.toggle("active", item.dataset.hitView === tag3dView));
       if (tag3dRuntime?.camera) {
         setTag3DCamera(tag3dRuntime.camera);
         tag3dRuntime.controls?.target.set(0, -120, 60);
@@ -1945,12 +1974,16 @@
       return note.tags.length ? note.tags.map(tag => renderTagSticker(tag, note.id)).join("") : "";
     }
 
-    function renderMarkdownBody(note, scope) {
-      const textWidth = note.textWidth ? ` style="width:${escapeAttr(note.textWidth)}"` : "";
+    function renderMarkdownBody(note, scope, textMaxHeight = "") {
+      const styles = [];
+      if (note.textWidth) styles.push(`width:${escapeAttr(note.textWidth)}`);
+      if (note.textHeight) styles.push(`height:${escapeAttr(note.textHeight)}`);
+      if (textMaxHeight) styles.push(`--text-max-height:${textMaxHeight}px`);
+      const styleAttr = styles.length ? ` style="${styles.join(";")}"` : "";
       if (markdownPreview) {
-        return `<div class="markdown-preview ${scope}-text" contenteditable="true" aria-label="本文プレビュー"${textWidth}>${markdownToHtml(note.text)}</div>`;
+        return `<div class="markdown-preview ${scope}-text" contenteditable="true" aria-label="本文プレビュー"${styleAttr}>${markdownToHtml(note.text)}</div>`;
       }
-      return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く"${textWidth}>${escapeHtml(note.text)}</textarea>`;
+      return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く"${styleAttr}>${escapeHtml(note.text)}</textarea>`;
     }
 
     function wireMarkdownBody(scope, note) {
@@ -1959,7 +1992,7 @@
         preview.addEventListener("contextmenu", (event) => {
           if (hasTextSelection(preview)) openTextContextMenu(event, note, preview);
         });
-        preview.addEventListener("mouseup", () => rememberTextFieldWidth(note, preview));
+        preview.addEventListener("mouseup", () => rememberTextFieldSize(note, preview));
         preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
         return;
       }
@@ -1969,23 +2002,37 @@
         if (hasTextSelection(textarea)) openTextContextMenu(event, note, textarea);
       });
       textarea.addEventListener("input", () => {
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        if (!note.textHeight) textarea.style.height = `${Math.min(textarea.scrollHeight, Number.parseFloat(getComputedStyle(textarea).maxHeight) || 150)}px`;
       });
-      textarea.addEventListener("mouseup", () => rememberTextFieldWidth(note, textarea));
+      textarea.addEventListener("mouseup", () => rememberTextFieldSize(note, textarea));
       textarea.addEventListener("change", () => updateNoteText(note, textarea.value));
     }
 
-    function rememberTextFieldWidth(note, field) {
-      const width = Math.round(field.getBoundingClientRect().width / boardZoom);
-      const defaultWidth = note.parentId ? 174 : Math.max(180, (note.w || 260) - 28);
+    function rememberTextFieldSize(note, field) {
+      const rect = field.getBoundingClientRect();
+      const width = Math.round(rect.width / boardZoom);
+      const height = Math.round(rect.height / boardZoom);
+      const defaultWidth = Math.max(160, (note.w || 260) - 28);
+      const defaultHeight = Math.min(96, maxTextHeightForNote(note));
       if (Math.abs(width - defaultWidth) < 6) {
-        if (!note.textWidth) return;
         note.textWidth = "";
       } else {
-        note.textWidth = `${Math.max(90, Math.min(520, width))}px`;
+        note.textWidth = `${Math.max(90, Math.min(defaultWidth, width))}px`;
+      }
+      if (Math.abs(height - defaultHeight) < 6) {
+        note.textHeight = "";
+      } else {
+        note.textHeight = `${Math.max(42, Math.min(maxTextHeightForNote(note), height))}px`;
       }
       persist();
+    }
+
+    function maxTextHeightForNote(note) {
+      const base = Math.max(52, (note.h || 188) - (note.parentId ? 104 : 122));
+      const children = childNotes(note.id);
+      if (!children.length) return base;
+      const firstChildTop = Math.min(...children.map(child => child.localY || 8));
+      return Math.max(42, Math.min(base, firstChildTop + 10));
     }
 
     function updateNoteText(note, value) {
@@ -2128,12 +2175,13 @@
       const query = el.searchInput.value.trim().toLowerCase();
       const isTag3D = boardMode === "3d";
       harmonizeChildColors();
-      if (!isTag3D) resolveRootOverlaps(null, 1);
+      if (!isTag3D && !skipAutoResolveOnce) resolveRootOverlaps(null, 1);
+      skipAutoResolveOnce = false;
       const notes = [...state.notes]
         .filter(note => !note.parentId)
         .sort((a, b) => {
           if (isTag3D) return new Date(b.updatedAt) - new Date(a.updatedAt);
-          return Number(b.pinned) - Number(a.pinned) || new Date(b.updatedAt) - new Date(a.updatedAt);
+          return new Date(b.updatedAt) - new Date(a.updatedAt);
         })
         .filter(note => noteMatchesQuery(note, query));
 
@@ -2147,7 +2195,7 @@
         const children = childNotes(note.id);
         const card = document.createElement("article");
         const isSelected = note.id === selectedId || selectedRootIds.has(note.id);
-        card.className = `note${isSelected ? " selected" : ""}${note.pinned ? " pinned" : ""}${note.collapsed ? " collapsed" : ""}`;
+        card.className = `note${isSelected ? " selected" : ""}${note.collapsed ? " collapsed" : ""}`;
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
         card.style.width = `${note.w || 260}px`;
@@ -2161,14 +2209,13 @@
           <div class="note-head">
             <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
             <span class="head-actions">
-              <button class="pin" title="ピン留め">${iconPin()}</button>
               <button class="image" title="画像を追加">${iconImage()}</button>
               <button class="history" title="このメモの履歴">${iconHistory()}</button>
               <button class="delete" title="削除">${iconTrash()}</button>
             </span>
           </div>
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
-          ${renderMarkdownBody(note, "note")}
+          ${renderMarkdownBody(note, "note", maxTextHeightForNote(note))}
           <div class="note-body">
             <div class="tag-row">${renderTags(note)}</div>
             <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
@@ -2199,9 +2246,17 @@
         card.addEventListener("mouseleave", () => card.classList.remove("edge-drag"));
 
         const head = card.querySelector(".note-head");
-        head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
-        head.addEventListener("mousedown", (event) => startMouseDrag(event, note, card));
-        card.querySelector(".note-resize").addEventListener("pointerdown", (event) => startNoteResize(event, note, card));
+        head.addEventListener("pointerdown", (event) => {
+          if (event.target.closest("button,input")) return;
+          startDrag(event, note, card);
+        });
+        head.addEventListener("mousedown", (event) => {
+          if (event.target.closest("button,input")) return;
+          startMouseDrag(event, note, card);
+        });
+        const resizeHandle = card.querySelector(".note-resize");
+        resizeHandle.addEventListener("pointerdown", (event) => startNoteResize(event, note, card), true);
+        resizeHandle.addEventListener("mousedown", (event) => startNoteMouseResize(event, note, card), true);
         card.addEventListener("contextmenu", (event) => openNoteContextMenu(event, note));
         card.addEventListener("dblclick", (event) => {
           if (event.target.closest("button,textarea")) return;
@@ -2219,15 +2274,6 @@
         });
 
         wireMarkdownBody(card, note);
-
-        card.querySelector(".pin").addEventListener("click", (event) => {
-          event.stopPropagation();
-          note.pinned = !note.pinned;
-          note.updatedAt = now();
-          recordEvent(note, "full", note.pinned ? "ピン留め" : "ピン解除", note.title);
-          persist();
-          render();
-        });
 
         card.querySelector(".image").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -2279,18 +2325,22 @@
 
     function renderChildNote(child) {
       return `
-        <section class="child-note${child.id === selectedId ? " selected" : ""}${child.collapsed ? " collapsed" : ""}" data-child-id="${child.id}" style="left:${child.localX || 8}px; top:${child.localY || 8}px; background:${child.color}; --note-font-size:${child.textSize || "11px"}; --note-font-family:${child.textFont || "system-ui, sans-serif"}">
+        <section class="child-note${child.id === selectedId ? " selected" : ""}${child.collapsed ? " collapsed" : ""}" data-child-id="${child.id}" style="left:${child.localX || 8}px; top:${child.localY || 8}px; width:${child.w || 230}px; height:${child.h || 160}px; background:${child.color}; --note-font-size:${child.textSize || "12px"}; --note-font-family:${child.textFont || "system-ui, sans-serif"}">
           <div class="child-head">
             <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
             <span class="head-actions">
-              <button class="child-select" title="選択">${iconSelect()}</button>
               <button class="child-image" title="画像を追加">${iconImage()}</button>
+              <button class="child-history" title="このメモの履歴">${iconHistory()}</button>
               <button class="child-delete" title="削除">${iconTrash()}</button>
             </span>
           </div>
-          ${renderMarkdownBody(child, "child")}
-          <div class="tag-row child-tags">${renderTags(child)}</div>
-          <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件</div>
+          <div class="child-meta">${formatDate(child.createdAt)} 作成 / ${formatDate(child.updatedAt)} 更新</div>
+          ${renderMarkdownBody(child, "child", maxTextHeightForNote(child))}
+          <div class="note-body">
+            <div class="tag-row child-tags">${renderTags(child)}</div>
+            <div class="note-images">${child.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
+          </div>
+          <button class="note-resize" title="付箋を拡大縮小" aria-label="付箋を拡大縮小"></button>
         </section>
       `;
     }
@@ -2302,6 +2352,10 @@
 
         childCard.addEventListener("pointerdown", (event) => {
           event.stopPropagation();
+          if (event.target === childCard || isNoteEdgePointer(event, childCard)) {
+            startChildDrag(event, child, childCard);
+            return;
+          }
           selectedId = child.id;
           persist();
           renderSidePanel();
@@ -2335,7 +2389,17 @@
 
         wireMarkdownBody(childCard, child);
 
-        childCard.querySelector(".child-select").addEventListener("click", (event) => {
+        const resizeHandle = childCard.querySelector(".note-resize");
+        resizeHandle.addEventListener("pointerdown", (event) => startNoteResize(event, child, childCard), true);
+        resizeHandle.addEventListener("mousedown", (event) => startNoteMouseResize(event, child, childCard), true);
+
+        childCard.querySelector(".child-image").addEventListener("click", (event) => {
+          event.stopPropagation();
+          imageTargetId = child.id;
+          el.imageInput.click();
+        });
+
+        childCard.querySelector(".child-history").addEventListener("click", (event) => {
           event.stopPropagation();
           selectedId = child.id;
           historyMode = "selected";
@@ -2344,12 +2408,6 @@
           el.tabTree.classList.remove("active");
           persist();
           render();
-        });
-
-        childCard.querySelector(".child-image").addEventListener("click", (event) => {
-          event.stopPropagation();
-          imageTargetId = child.id;
-          el.imageInput.click();
         });
 
         childCard.querySelector(".child-delete").addEventListener("click", (event) => {
@@ -2467,7 +2525,6 @@
       menu.style.top = `${event.clientY}px`;
       menu.innerHTML = `
         <button data-action="move">${iconMove()} 移動先を指示</button>
-        ${isRoot ? `<button data-action="pin">${iconPin()} ${note.pinned ? "ピン解除" : "ピン留め"}</button>` : ""}
         <button data-action="image">${iconImage()} 画像を追加</button>
         <button data-action="history">${iconHistory()} 履歴を表示</button>
         <button data-action="delete">${iconTrash()} 削除</button>
@@ -2478,14 +2535,6 @@
         clickEvent.stopPropagation();
         if (action === "move") {
           startCommandMove(moveIds, note.parentId ? "child" : "root", event.clientX, event.clientY);
-        } else if (action === "pin") {
-          moveIds.map(findNote).filter(Boolean).forEach(item => {
-            item.pinned = !item.pinned;
-            item.updatedAt = now();
-            recordEvent(item, "full", item.pinned ? "ピン留め" : "ピン解除", item.title);
-          });
-          persist();
-          render();
         } else if (action === "image") {
           imageTargetId = note.id;
           el.imageInput.click();
@@ -2845,7 +2894,7 @@
 
     function childVisualHeight(child) {
       if (child.collapsed) return 54;
-      return 138;
+      return child.h || 160;
     }
 
     function toggleCollapsed(note) {
@@ -2858,6 +2907,8 @@
 
     function startChildDrag(event, child, childCard) {
       if (event.button !== 0) return;
+      if (event.target.closest(".note-resize,.head-actions,button")) return;
+      if (!isNoteEdgePointer(event, childCard) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       event.preventDefault();
       event.stopPropagation();
       childCard.setPointerCapture(event.pointerId);
@@ -2878,6 +2929,8 @@
 
     function startChildMouseDrag(event, child, childCard) {
       if (event.button !== 0) return;
+      if (event.target.closest(".note-resize,.head-actions,button")) return;
+      if (!isNoteEdgePointer(event, childCard) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       event.preventDefault();
       event.stopPropagation();
       childCard.classList.add("dragging");
@@ -2911,8 +2964,9 @@
       if (!childCard) return;
       const container = childCard.parentElement;
       const maxX = Math.max(0, container.clientWidth - childCard.offsetWidth - 8);
+      const maxY = Math.max(0, container.clientHeight - childCard.offsetHeight - 8);
       child.localX = Math.max(0, Math.min(maxX, drag.noteX + clientX - drag.startX));
-      child.localY = Math.max(0, drag.noteY + clientY - drag.startY);
+      child.localY = Math.max(0, Math.min(maxY, drag.noteY + clientY - drag.startY));
       drag.moved = true;
       childCard.style.left = `${child.localX}px`;
       childCard.style.top = `${child.localY}px`;
@@ -2956,7 +3010,8 @@
       if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-      card.setPointerCapture(event.pointerId);
+      event.stopImmediatePropagation();
+      event.target.setPointerCapture?.(event.pointerId);
       drag = {
         id: note.id,
         type: "note-resize",
@@ -2967,32 +3022,69 @@
         startH: note.h || card.offsetHeight || 188
       };
       card.classList.add("dragging");
-      card.addEventListener("pointermove", onNoteResize);
-      card.addEventListener("pointerup", endNoteResize, { once: true });
-      card.addEventListener("pointercancel", endNoteResize, { once: true });
+      window.addEventListener("pointermove", onNoteResize);
+      window.addEventListener("pointerup", endNoteResize, { once: true });
+      window.addEventListener("pointercancel", endNoteResize, { once: true });
+    }
+
+    function startNoteMouseResize(event, note, card) {
+      if (event.button !== 0 || drag?.type === "note-resize") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      drag = {
+        id: note.id,
+        type: "note-resize-mouse",
+        startX: event.clientX,
+        startY: event.clientY,
+        startW: note.w || card.offsetWidth || 260,
+        startH: note.h || card.offsetHeight || 188
+      };
+      card.classList.add("dragging");
+      window.addEventListener("mousemove", onNoteMouseResize);
+      window.addEventListener("mouseup", endNoteResize, { once: true });
     }
 
     function onNoteResize(event) {
       if (!drag || drag.type !== "note-resize" || event.pointerId !== drag.pointerId) return;
+      resizeNoteToClient(event.clientX, event.clientY);
+    }
+
+    function onNoteMouseResize(event) {
+      if (!drag || drag.type !== "note-resize-mouse") return;
+      resizeNoteToClient(event.clientX, event.clientY);
+    }
+
+    function resizeNoteToClient(clientX, clientY) {
       const note = findNote(drag.id);
-      const card = document.querySelector(`.note[data-id="${drag.id}"]`);
+      const card = note?.parentId
+        ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`)
+        : document.querySelector(`.note[data-id="${drag.id}"]`);
       if (!note || !card) return;
-      note.w = Math.max(220, Math.round(drag.startW + (event.clientX - drag.startX) / boardZoom));
-      note.h = Math.max(150, Math.round(drag.startH + (event.clientY - drag.startY) / boardZoom));
+      const parentBox = note.parentId ? card.parentElement : null;
+      const maxW = parentBox ? Math.max(150, parentBox.clientWidth - (note.localX || 0) - 8) : 1200;
+      const maxH = parentBox ? Math.max(110, parentBox.clientHeight - (note.localY || 0) - 8) : 900;
+      note.w = Math.min(maxW, Math.max(note.parentId ? 170 : 220, Math.round(drag.startW + (clientX - drag.startX) / boardZoom)));
+      note.h = Math.min(maxH, Math.max(note.parentId ? 130 : 150, Math.round(drag.startH + (clientY - drag.startY) / boardZoom)));
       card.style.width = `${note.w}px`;
       card.style.height = `${note.h}px`;
     }
 
     function endNoteResize(event) {
-      const card = drag ? document.querySelector(`.note[data-id="${drag.id}"]`) : null;
+      const note = drag ? findNote(drag.id) : null;
+      const card = note?.parentId
+        ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`)
+        : document.querySelector(`.note[data-id="${drag.id}"]`);
       if (card) {
         card.classList.remove("dragging");
-        card.removeEventListener("pointermove", onNoteResize);
       }
-      const note = drag ? findNote(drag.id) : null;
+      window.removeEventListener("pointermove", onNoteResize);
+      window.removeEventListener("mousemove", onNoteMouseResize);
       if (note) {
         note.updatedAt = now();
-        resolveRootOverlaps(null, 1);
+        if (!note.parentId) resolveRootOverlaps(null, 1);
+        const parent = note.parentId ? findNote(note.parentId) : null;
+        if (parent) parent.updatedAt = note.updatedAt;
         persist();
         render();
       }
@@ -3001,6 +3093,7 @@
 
     function startDrag(event, note, card) {
       if (event.button !== 0) return;
+      if (event.target.closest(".note-resize,.head-actions,button")) return;
       if (!isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       if (drag?.type === "note-mouse") return;
       event.preventDefault();
@@ -3065,6 +3158,7 @@
 
     function startMouseDrag(event, note, card) {
       if (event.button !== 0) return;
+      if (event.target.closest(".note-resize,.head-actions,button")) return;
       if (!isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       event.preventDefault();
       event.stopPropagation();
@@ -3152,9 +3246,11 @@
     function isNoteEdgePointer(event, card) {
       if (!card || !event) return false;
       const rect = card.getBoundingClientRect();
+      const resizeCorner = 38;
       const edge = 14;
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      if (rect.width - x <= resizeCorner && rect.height - y <= resizeCorner) return false;
       return x <= edge || y <= edge || rect.width - x <= edge || rect.height - y <= edge;
     }
 
@@ -3380,13 +3476,13 @@
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(el.canvas.clientWidth, el.canvas.clientHeight, false);
-        renderer.setClearColor(0xffffff, 1);
+        renderer.setClearColor(0x000000, 1);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xffffff);
-        scene.fog = new THREE.Fog(0xffffff, 1900, 4200);
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 2200, 5200);
         const aspect = el.canvas.clientWidth / el.canvas.clientHeight;
         const viewSize = 1180;
         const camera = new THREE.OrthographicCamera(
@@ -3413,7 +3509,7 @@
           RIGHT: THREE.MOUSE.ROTATE
         };
 
-        scene.add(new THREE.HemisphereLight(0xffffff, 0xdadce0, 2.2));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x30343a, 2.2));
         const light = new THREE.DirectionalLight(0xffffff, 1.9);
         light.position.set(420, 780, 620);
         light.castShadow = true;
@@ -3433,107 +3529,144 @@
         const yForTime = (time) => timeAxisMinY + ((time - minTime) / timeRange) * (timeAxisMaxY - timeAxisMinY);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
         const colorGroups = [...new Set(events.map(event => event.colorName))].sort((a, b) => a.localeCompare(b, "ja"));
-        const categoryGap = 320;
-        const categoryBaseX = -420;
-        const planeWidth = Math.max(1700, categories.length * categoryGap + 700);
-        const planeDepth = 1200;
+        const categoryGap = 330;
+        const planeWidth = Math.max(1400, categories.length * categoryGap + 620, Math.sqrt(Math.max(1, events.length)) * 420 + 760);
+        const planeDepth = Math.max(1000, colorGroups.length * 160 + 620, Math.sqrt(Math.max(1, events.length)) * 280 + 560);
         const planeY = -300;
         const centimeter = 20;
+        const originX = -planeWidth / 2;
+        const originZ = 160 - planeDepth / 2;
+        const axisY = planeY + 8;
+        const categoryStartX = originX + 220;
+        const colorStartZ = originZ + 210;
+        const xAxisEnd = planeWidth / 2 - 90;
+        const zAxisEnd = 160 + planeDepth / 2 - 90;
 
         const plane = new THREE.Mesh(
           new THREE.PlaneGeometry(planeWidth, planeDepth),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .76, metalness: 0 })
+          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .82, metalness: 0, transparent: false })
         );
         plane.rotation.x = -Math.PI / 2;
         plane.position.set(0, planeY - 1, 160);
         plane.receiveShadow = true;
         scene.add(plane);
 
-        const grid = new THREE.GridHelper(planeWidth, Math.round(planeWidth / centimeter), 0xd2d6dc, 0xe6e8eb);
-        grid.position.set(0, planeY, 160);
-        grid.material.opacity = .9;
-        grid.material.transparent = true;
+        const gridPoints = [];
+        const minX = -planeWidth / 2;
+        const maxX = planeWidth / 2;
+        const minZ = 160 - planeDepth / 2;
+        const maxZ = 160 + planeDepth / 2;
+        for (let x = minX; x <= maxX + .1; x += centimeter) {
+          gridPoints.push(new THREE.Vector3(x, planeY + 1, minZ), new THREE.Vector3(x, planeY + 1, maxZ));
+        }
+        for (let z = minZ; z <= maxZ + .1; z += centimeter) {
+          gridPoints.push(new THREE.Vector3(minX, planeY + 1, z), new THREE.Vector3(maxX, planeY + 1, z));
+        }
+        const grid = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(gridPoints),
+          new THREE.LineBasicMaterial({ color: 0x4b5563, transparent: true, opacity: .86 })
+        );
         scene.add(grid);
 
-        const axisMaterial = new THREE.LineBasicMaterial({ color: 0x9aa0a6 });
+        const axisMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 });
+        const axisTubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const addAxisTube = (start, end, radius = 2.6) => {
+          const direction = new THREE.Vector3().subVectors(end, start);
+          const length = direction.length();
+          const geometry = new THREE.CylinderGeometry(radius, radius, length, 12);
+          const mesh = new THREE.Mesh(geometry, axisTubeMaterial);
+          mesh.position.copy(start).add(end).multiplyScalar(.5);
+          mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+          scene.add(mesh);
+          return mesh;
+        };
         const yAxis = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-planeWidth / 2 + 120, timeAxisMinY, -420),
-          new THREE.Vector3(-planeWidth / 2 + 120, timeAxisMaxY, -420)
+          new THREE.Vector3(originX, timeAxisMinY, originZ),
+          new THREE.Vector3(originX, timeAxisMaxY, originZ)
         ]);
         scene.add(new THREE.Line(yAxis, axisMaterial));
+        addAxisTube(new THREE.Vector3(originX, timeAxisMinY, originZ), new THREE.Vector3(originX, timeAxisMaxY, originZ), 2.8);
         const axisTitle = makeLabel(THREE, "時間", "軸", "");
-        axisTitle.position.set(-planeWidth / 2 + 64, timeAxisMaxY + 46, -420);
+        axisTitle.position.set(originX - 104, timeAxisMaxY + 54, originZ - 42);
         scene.add(axisTitle);
 
-        const xAxisY = planeY + 8;
-        const xAxisZ = -470;
         const xAxis = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-planeWidth / 2 + 150, xAxisY, xAxisZ),
-          new THREE.Vector3(planeWidth / 2 - 150, xAxisY, xAxisZ)
+          new THREE.Vector3(originX, axisY, originZ),
+          new THREE.Vector3(xAxisEnd, axisY, originZ)
         ]);
-        scene.add(new THREE.Line(xAxis, new THREE.LineBasicMaterial({ color: 0xb6bbc2 })));
+        scene.add(new THREE.Line(xAxis, axisMaterial));
+        addAxisTube(new THREE.Vector3(originX, axisY, originZ), new THREE.Vector3(xAxisEnd, axisY, originZ), 2.5);
         const xAxisLabel = makeLabel(THREE, el.classifySelect.value === "tag" ? "タグ分類" : "色分類", "水平軸", "");
-        xAxisLabel.position.set(0, xAxisY + 42, xAxisZ - 20);
+        xAxisLabel.position.set((originX + xAxisEnd) / 2, axisY + 54, originZ - 92);
         scene.add(xAxisLabel);
 
-        const zAxisX = planeWidth / 2 - 170;
         const zAxis = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(zAxisX, xAxisY, -430),
-          new THREE.Vector3(zAxisX, xAxisY, 420)
+          new THREE.Vector3(originX, axisY, originZ),
+          new THREE.Vector3(originX, axisY, zAxisEnd)
         ]);
-        scene.add(new THREE.Line(zAxis, new THREE.LineBasicMaterial({ color: 0xb6bbc2 })));
+        scene.add(new THREE.Line(zAxis, axisMaterial));
+        addAxisTube(new THREE.Vector3(originX, axisY, originZ), new THREE.Vector3(originX, axisY, zAxisEnd), 2.5);
         const zAxisLabel = makeLabel(THREE, "色奥行き", "奥行き軸", "");
-        zAxisLabel.position.set(zAxisX - 44, xAxisY + 42, 450);
+        zAxisLabel.position.set(originX - 108, axisY + 54, zAxisEnd);
         scene.add(zAxisLabel);
 
         categories.forEach((category, index) => {
-          const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
+          const x = categoryStartX + index * categoryGap;
           const label = makeLabel(THREE, category, el.classifySelect.value === "tag" ? "タグ" : "色", "");
-          label.position.set(x, planeY + 24, -390);
+          label.position.set(x, axisY + 46, originZ - 92);
           label.rotation.x = -Math.PI / 7;
           scene.add(label);
           const tickGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(x, xAxisY, xAxisZ - 18),
-            new THREE.Vector3(x, xAxisY, xAxisZ + 18)
+            new THREE.Vector3(x, axisY, originZ),
+            new THREE.Vector3(x, axisY, originZ - 76)
           ]);
-          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xc5c9cf })));
+          scene.add(new THREE.Line(tickGeo, axisMaterial));
+          addAxisTube(new THREE.Vector3(x, axisY, originZ), new THREE.Vector3(x, axisY, originZ - 76), 1.7);
         });
 
         colorGroups.forEach((colorGroup, index) => {
-          const z = colorDepth(colorGroup, colorGroups);
+          const z = colorStartZ + index * 150;
           const label = makeLabel(THREE, colorGroup, "色奥行き", "");
-          label.position.set(planeWidth / 2 - 210, planeY + 26, z);
+          label.position.set(originX - 108, axisY + 46, z);
           label.rotation.x = -Math.PI / 7;
           scene.add(label);
           const tickGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(zAxisX - 18, xAxisY, z),
-            new THREE.Vector3(zAxisX + 18, xAxisY, z)
+            new THREE.Vector3(originX, axisY, z),
+            new THREE.Vector3(originX - 76, axisY, z)
           ]);
-          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xc5c9cf })));
+          scene.add(new THREE.Line(tickGeo, axisMaterial));
+          addAxisTube(new THREE.Vector3(originX, axisY, z), new THREE.Vector3(originX - 76, axisY, z), 1.7);
         });
 
         buildTimeTicks(minTime, maxTime, 8).forEach(tick => {
           const y = yForTime(tick);
           const label = makeAxisTickLabel(THREE, formatAxisTime(tick), "時刻");
-          label.position.set(-planeWidth / 2 + 70, y, -430);
+          label.position.set(originX - 130, y, originZ - 24);
           scene.add(label);
           const shortTick = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-planeWidth / 2 + 95, y, -420),
-            new THREE.Vector3(-planeWidth / 2 + 145, y, -420)
+            new THREE.Vector3(originX, y, originZ),
+            new THREE.Vector3(originX - 82, y, originZ)
           ]);
-          scene.add(new THREE.Line(shortTick, new THREE.LineBasicMaterial({ color: 0x9aa0a6 })));
+          scene.add(new THREE.Line(shortTick, axisMaterial));
+          addAxisTube(new THREE.Vector3(originX, y, originZ), new THREE.Vector3(originX - 82, y, originZ), 1.7);
           const tickGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-planeWidth / 2 + 105, y, -420),
-            new THREE.Vector3(planeWidth / 2 - 120, y, -420)
+            new THREE.Vector3(originX, y, originZ),
+            new THREE.Vector3(xAxisEnd, y, originZ)
           ]);
-          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xdadce0, transparent: true, opacity: .62 })));
+          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .55 })));
         });
 
+        const laneCounts = new Map();
         events.forEach((event, index) => {
           const catIndex = Math.max(0, categories.indexOf(event.category));
-          const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + catIndex * categoryGap;
+          const x = categoryStartX + catIndex * categoryGap;
           const y = yForTime(new Date(event.at).getTime());
-          const z = colorDepth(event.colorName, colorGroups) + (index % 4) * 18;
+          const laneKey = `${event.parentId || event.noteId}:${Math.round(y / 28)}`;
+          const laneIndex = laneCounts.get(laneKey) || 0;
+          laneCounts.set(laneKey, laneIndex + 1);
+          const colorIndex = Math.max(0, colorGroups.indexOf(event.colorName));
+          const hierarchyOffset = event.parentId ? 76 + (event.childIndex || 0) * 62 : 0;
+          const z = colorStartZ + colorIndex * 150 + hierarchyOffset + laneIndex * 16;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
@@ -3601,8 +3734,11 @@
 
     function get3DBoardEvents(notes) {
       const granularity = el.granularitySelect.value;
-      return notes.flatMap(note => {
+      const noteSet = new Set(notes.map(note => note.id));
+      const visibleNotes = state.notes.filter(note => noteSet.has(note.id) || noteSet.has(note.parentId));
+      return visibleNotes.flatMap(note => {
         const effectiveColor = effectiveNoteColor(note);
+        const siblings = note.parentId ? childNotes(note.parentId) : [];
         const category = el.classifySelect.value === "tag" ? (firstTag(note) || "タグなし") : colorName(effectiveColor);
         return note.history
           .filter(event => {
@@ -3614,6 +3750,9 @@
             ...event,
             noteId: note.id,
             noteTitle: note.title,
+            parentId: note.parentId || "",
+            isChild: Boolean(note.parentId),
+            childIndex: note.parentId ? Math.max(0, siblings.findIndex(child => child.id === note.id)) : 0,
             category,
             color: note.color,
             colorName: colorName(effectiveColor),
@@ -3677,13 +3816,15 @@
 
     function makeEvent3DCard(THREE, event) {
       const group = new THREE.Group();
-      const geometry = new THREE.BoxGeometry(240, 6, 104);
+      const width = event.isChild ? 120 : 240;
+      const depth = event.isChild ? 58 : 104;
+      const geometry = new THREE.BoxGeometry(width, 6, depth);
       const baseMaterial = new THREE.MeshStandardMaterial({
         color: new THREE.Color(event.color || "#fff8c7"),
         roughness: .58,
         metalness: .03
       });
-      const topMaterial = makeCardSurfaceMaterial(THREE, event);
+      const topMaterial = makeCardSurfaceMaterial(THREE, event, width, depth);
       const materials = [
         baseMaterial,
         baseMaterial.clone(),
@@ -3808,7 +3949,7 @@
       card.scale.setScalar(active ? 1.14 : 1);
     }
 
-    function makeCardSurfaceMaterial(THREE, event) {
+    function makeCardSurfaceMaterial(THREE, event, width = 240, depth = 104) {
       const canvas = document.createElement("canvas");
       canvas.width = 512;
       canvas.height = 256;
@@ -3826,11 +3967,11 @@
         ctx.stroke();
       }
       ctx.fillStyle = "#202124";
-      ctx.font = "bold 28px system-ui, sans-serif";
-      ctx.fillText(`${typeLabel[event.type] || event.type}: ${event.noteTitle}`.slice(0, 24), 28, 48);
+      ctx.font = event.isChild ? "bold 24px system-ui, sans-serif" : "bold 28px system-ui, sans-serif";
+      ctx.fillText(`${event.isChild ? "子: " : ""}${typeLabel[event.type] || event.type}: ${event.noteTitle}`.slice(0, event.isChild ? 16 : 24), 28, 48);
       ctx.fillStyle = "#5f6368";
-      ctx.font = "20px system-ui, sans-serif";
-      wrapCanvasText(ctx, `${formatDate(event.at)} ${event.preview || ""}`, 28, 84, 456, 26, 4);
+      ctx.font = event.isChild ? "18px system-ui, sans-serif" : "20px system-ui, sans-serif";
+      wrapCanvasText(ctx, `${formatDate(event.at)} ${event.preview || ""}`, 28, 84, 456, event.isChild ? 24 : 26, event.isChild ? 3 : 4);
       ctx.fillStyle = "#174ea6";
       ctx.font = "bold 20px system-ui, sans-serif";
       ctx.fillText(event.category || "", 28, 226);
@@ -4034,8 +4175,8 @@
       canvas.width = 640;
       canvas.height = 200;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#111827";
-      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(0,0,0,.82)";
       ctx.lineWidth = 7;
       ctx.lineJoin = "round";
       ctx.font = "bold 38px system-ui, sans-serif";
@@ -4043,8 +4184,8 @@
         ctx.strokeText(line1, 28, 64);
         ctx.fillText(line1, 28, 64);
       }
-      ctx.fillStyle = "#374151";
-      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(0,0,0,.82)";
       ctx.lineWidth = 6;
       ctx.font = "29px system-ui, sans-serif";
       if (line2) {
@@ -4052,8 +4193,8 @@
         ctx.strokeText(text, 28, 112);
         ctx.fillText(text, 28, 112);
       }
-      ctx.fillStyle = "#6b7280";
-      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(0,0,0,.82)";
       ctx.lineWidth = 5;
       ctx.font = "24px system-ui, sans-serif";
       if (line3) {
@@ -4072,15 +4213,15 @@
       canvas.width = 384;
       canvas.height = 128;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#5f6368";
-      ctx.strokeStyle = "rgba(255,255,255,.94)";
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(0,0,0,.86)";
       ctx.lineWidth = 7;
       ctx.lineJoin = "round";
       ctx.font = "bold 34px system-ui, sans-serif";
       ctx.strokeText(line1 || "", 12, 44);
       ctx.fillText(line1 || "", 12, 44);
-      ctx.fillStyle = "#9aa0a6";
-      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(0,0,0,.86)";
       ctx.lineWidth = 5;
       ctx.font = "22px system-ui, sans-serif";
       if (line2) {
@@ -4139,9 +4280,6 @@
       toast.timer = setTimeout(() => el.toast.classList.remove("show"), 1800);
     }
 
-    function iconPin() {
-      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 4 6 6-4 1-4 9-2-2 4-9-1-1-9 4-2-2 9-4 1-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    }
     function iconImage() {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.8"/><path d="m7 16 4-4 3 3 2-2 3 3M8.5 9.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     }
