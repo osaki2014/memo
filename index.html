@@ -347,7 +347,7 @@
 
     .cube-hit {
       position: absolute;
-      z-index: 5;
+      z-index: 30;
       min-width: 0;
       height: auto;
       padding: 0;
@@ -357,6 +357,7 @@
       box-shadow: none !important;
       color: transparent;
       transform: none !important;
+      pointer-events: auto;
     }
 
     .cube-hit:hover {
@@ -656,7 +657,7 @@
       margin: 4px 0 8px;
       min-height: 38px;
       height: var(--child-area-height, 190px);
-      max-height: 260px;
+      max-height: none;
       overflow: auto;
       border-radius: 8px;
     }
@@ -1625,6 +1626,7 @@
       if (note.parentId) {
         const parent = findNote(note.parentId);
         if (parent) {
+          ensureParentFitsChildren(parent);
           parent.updatedAt = createdAt;
           recordEvent(parent, "full", "子メモ追加", note.title, createdAt);
         }
@@ -1977,7 +1979,11 @@
     function renderMarkdownBody(note, scope, textMaxHeight = "") {
       const styles = [];
       if (note.textWidth) styles.push(`width:${escapeAttr(note.textWidth)}`);
-      if (note.textHeight) styles.push(`height:${escapeAttr(note.textHeight)}`);
+      if (note.textHeight) {
+        styles.push(`height:${escapeAttr(note.textHeight)}`);
+      } else {
+        styles.push(`height:${defaultTextHeight(note, textMaxHeight)}px`);
+      }
       if (textMaxHeight) styles.push(`--text-max-height:${textMaxHeight}px`);
       const styleAttr = styles.length ? ` style="${styles.join(";")}"` : "";
       if (markdownPreview) {
@@ -1986,25 +1992,42 @@
       return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く"${styleAttr}>${escapeHtml(note.text)}</textarea>`;
     }
 
+    function defaultTextHeight(note, textMaxHeight = "") {
+      const maxHeight = Number.parseFloat(textMaxHeight) || maxTextHeightForNote(note);
+      const preferred = childNotes(note.id).length
+        ? Math.min(96, maxHeight)
+        : Math.max(56, (note.h || 188) - (note.parentId ? 104 : 132));
+      return Math.max(42, Math.min(maxHeight, preferred));
+    }
+
     function wireMarkdownBody(scope, note) {
       const preview = scope.querySelector(".markdown-preview");
       if (preview) {
+        preview.addEventListener("mousedown", (event) => markTextResizeGesture(event, preview));
         preview.addEventListener("contextmenu", (event) => {
           if (hasTextSelection(preview)) openTextContextMenu(event, note, preview);
         });
-        preview.addEventListener("mouseup", () => rememberTextFieldSize(note, preview));
+        preview.addEventListener("mouseup", () => {
+          rememberTextFieldSize(note, preview);
+          growNoteForTextField(note, preview);
+        });
         preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
         return;
       }
       const textarea = scope.querySelector("textarea");
       if (!textarea) return;
+      textarea.addEventListener("mousedown", (event) => markTextResizeGesture(event, textarea));
       textarea.addEventListener("contextmenu", (event) => {
         if (hasTextSelection(textarea)) openTextContextMenu(event, note, textarea);
       });
       textarea.addEventListener("input", () => {
         if (!note.textHeight) textarea.style.height = `${Math.min(textarea.scrollHeight, Number.parseFloat(getComputedStyle(textarea).maxHeight) || 150)}px`;
+        growNoteForTextField(note, textarea);
       });
-      textarea.addEventListener("mouseup", () => rememberTextFieldSize(note, textarea));
+      textarea.addEventListener("mouseup", () => {
+        rememberTextFieldSize(note, textarea);
+        growNoteForTextField(note, textarea);
+      });
       textarea.addEventListener("change", () => updateNoteText(note, textarea.value));
     }
 
@@ -2027,12 +2050,86 @@
       persist();
     }
 
+    function markTextResizeGesture(event, field) {
+      const rect = field.getBoundingClientRect();
+      const nearRight = rect.right - event.clientX <= 18;
+      const nearBottom = rect.bottom - event.clientY <= 18;
+      field.dataset.resizeGesture = nearRight || nearBottom ? "true" : "";
+    }
+
     function maxTextHeightForNote(note) {
-      const base = Math.max(52, (note.h || 188) - (note.parentId ? 104 : 122));
+      const base = Math.max(52, (note.h || 188) - (note.parentId ? 102 : 122));
       const children = childNotes(note.id);
       if (!children.length) return base;
       const firstChildTop = Math.min(...children.map(child => child.localY || 8));
       return Math.max(42, Math.min(base, firstChildTop + 10));
+    }
+
+    function growNoteForTextField(note, field) {
+      if (!note || boardMode === "3d") return;
+      const card = note.parentId
+        ? document.querySelector(`.child-note[data-child-id="${note.id}"]`)
+        : document.querySelector(`.note[data-id="${note.id}"]`);
+      if (!card || !field) return;
+      const fieldRect = field.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const rightOverflow = Math.ceil((fieldRect.right - (cardRect.right - 16)) / boardZoom);
+      const bottomOverflow = Math.ceil((fieldRect.bottom - (cardRect.bottom - 18)) / boardZoom);
+      const resizedAtEdge = field.dataset.resizeGesture === "true";
+      const nearRightEdge = cardRect.right - fieldRect.right <= 24;
+      const nearBottomEdge = cardRect.bottom - fieldRect.bottom <= 24;
+      let changed = false;
+      if (rightOverflow > 0) {
+        note.w = Math.min(1400, (note.w || card.offsetWidth || 260) + rightOverflow + 28);
+        changed = true;
+      } else if (resizedAtEdge && nearRightEdge) {
+        note.w = Math.min(1400, (note.w || card.offsetWidth || 260) + 96);
+        note.textWidth = `${Math.max(90, (note.w || 260) - 28)}px`;
+        changed = true;
+      }
+      if (bottomOverflow > 0) {
+        const delta = bottomOverflow + 28;
+        pushChildrenDownForTextResize(note, delta);
+        note.h = Math.min(1200, (note.h || card.offsetHeight || 188) + delta);
+        changed = true;
+      } else if (resizedAtEdge && nearBottomEdge) {
+        const delta = 96;
+        pushChildrenDownForTextResize(note, delta);
+        note.h = Math.min(1200, (note.h || card.offsetHeight || 188) + delta);
+        note.textHeight = `${Math.min(maxTextHeightForNote(note), Math.max(42, Number.parseFloat(note.textHeight || "") || fieldRect.height / boardZoom))}px`;
+        changed = true;
+      }
+      field.dataset.resizeGesture = "";
+      if (!changed) return;
+      autoFitNoteInternals(note);
+      if (note.parentId) {
+        const parent = findNote(note.parentId);
+        if (parent) ensureParentFitsChildren(parent);
+      }
+      note.updatedAt = now();
+      persist();
+      renderNotes();
+    }
+
+    function pushChildrenDownForTextResize(note, delta) {
+      const children = childNotes(note.id);
+      if (!children.length || delta <= 0) return;
+      children.forEach(child => {
+        child.localY = (child.localY || 8) + delta;
+      });
+    }
+
+    function autoFitNoteInternals(note) {
+      const maxWidth = Math.max(90, (note.w || 260) - 28);
+      if (note.textWidth) {
+        const width = Math.min(maxWidth, Number.parseFloat(note.textWidth) || maxWidth);
+        note.textWidth = `${width}px`;
+      }
+      const maxHeight = maxTextHeightForNote(note);
+      if (note.textHeight) {
+        const height = Math.min(maxHeight, Number.parseFloat(note.textHeight) || maxHeight);
+        note.textHeight = `${Math.max(42, height)}px`;
+      }
     }
 
     function updateNoteText(note, value) {
@@ -2792,6 +2889,7 @@
       child.updatedAt = adoptedAt;
       parent.collapsed = false;
       parent.updatedAt = adoptedAt;
+      ensureParentFitsChildren(parent);
       if (previousParent) previousParent.updatedAt = adoptedAt;
       recordEvent(child, "full", "親メモへ移動", `${parent.title} の中へ移動`, adoptedAt);
       recordEvent(parent, "full", "子メモ受け入れ", child.title, adoptedAt);
@@ -2889,12 +2987,34 @@
     function childAreaHeight(children) {
       if (children.length === 0) return 46;
       const bottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
-      return Math.max(160, bottom + 18);
+      return Math.max(160, bottom + 24);
     }
 
     function childVisualHeight(child) {
       if (child.collapsed) return 54;
       return child.h || 160;
+    }
+
+    function childVisualWidth(child) {
+      return child.collapsed ? Math.min(child.w || 230, 230) : (child.w || 230);
+    }
+
+    function ensureParentFitsChildren(parent) {
+      if (!parent || parent.parentId) return false;
+      const children = childNotes(parent.id);
+      if (!children.length) return false;
+      const childRight = Math.max(...children.map(child => (child.localX || 8) + childVisualWidth(child)));
+      const childBottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
+      const neededW = Math.max(parent.w || 260, childRight + 46);
+      const textReserve = Number.parseFloat(parent.textHeight || "") || Math.min(96, maxTextHeightForNote({ ...parent, h: parent.h || 188 }));
+      const neededH = Math.max(parent.h || 188, 118 + textReserve + childBottom + 48);
+      const changed = neededW !== parent.w || neededH !== parent.h;
+      if (changed) {
+        parent.w = Math.min(1400, neededW);
+        parent.h = Math.min(1300, neededH);
+        autoFitNoteInternals(parent);
+      }
+      return changed;
     }
 
     function toggleCollapsed(note) {
@@ -2963,13 +3083,21 @@
       const childCard = document.querySelector(`.child-note[data-child-id="${child.id}"]`);
       if (!childCard) return;
       const container = childCard.parentElement;
-      const maxX = Math.max(0, container.clientWidth - childCard.offsetWidth - 8);
-      const maxY = Math.max(0, container.clientHeight - childCard.offsetHeight - 8);
+      const maxX = Math.max(0, 1400 - childCard.offsetWidth - 8);
+      const maxY = Math.max(0, 1100 - childCard.offsetHeight - 8);
       child.localX = Math.max(0, Math.min(maxX, drag.noteX + clientX - drag.startX));
       child.localY = Math.max(0, Math.min(maxY, drag.noteY + clientY - drag.startY));
       drag.moved = true;
       childCard.style.left = `${child.localX}px`;
       childCard.style.top = `${child.localY}px`;
+      const parent = findNote(child.parentId);
+      if (parent && ensureParentFitsChildren(parent)) {
+        const parentCard = document.querySelector(`.note[data-id="${parent.id}"]`);
+        if (parentCard) {
+          parentCard.style.width = `${parent.w}px`;
+          parentCard.style.height = `${parent.h}px`;
+        }
+      }
     }
 
     function endChildDrag(event) {
@@ -2981,7 +3109,10 @@
         if (child) {
           child.updatedAt = now();
           const parent = findNote(child.parentId);
-          if (parent) parent.updatedAt = child.updatedAt;
+          if (parent) {
+            ensureParentFitsChildren(parent);
+            parent.updatedAt = child.updatedAt;
+          }
           persist();
           render();
         }
@@ -2998,7 +3129,10 @@
         if (child) {
           child.updatedAt = now();
           const parent = findNote(child.parentId);
-          if (parent) parent.updatedAt = child.updatedAt;
+          if (parent) {
+            ensureParentFitsChildren(parent);
+            parent.updatedAt = child.updatedAt;
+          }
           persist();
           render();
         }
@@ -3081,10 +3215,14 @@
       window.removeEventListener("pointermove", onNoteResize);
       window.removeEventListener("mousemove", onNoteMouseResize);
       if (note) {
+        autoFitNoteInternals(note);
         note.updatedAt = now();
         if (!note.parentId) resolveRootOverlaps(null, 1);
         const parent = note.parentId ? findNote(note.parentId) : null;
-        if (parent) parent.updatedAt = note.updatedAt;
+        if (parent) {
+          ensureParentFitsChildren(parent);
+          parent.updatedAt = note.updatedAt;
+        }
         persist();
         render();
       }
@@ -3529,16 +3667,31 @@
         const yForTime = (time) => timeAxisMinY + ((time - minTime) / timeRange) * (timeAxisMaxY - timeAxisMinY);
         const categories = [...new Set(events.map(event => event.category))].sort((a, b) => a.localeCompare(b, "ja"));
         const colorGroups = [...new Set(events.map(event => event.colorName))].sort((a, b) => a.localeCompare(b, "ja"));
-        const categoryGap = 330;
-        const planeWidth = Math.max(1400, categories.length * categoryGap + 620, Math.sqrt(Math.max(1, events.length)) * 420 + 760);
-        const planeDepth = Math.max(1000, colorGroups.length * 160 + 620, Math.sqrt(Math.max(1, events.length)) * 280 + 560);
+        const categoryGap = 260;
+        const colorGap = 130;
+        const childGap = 54;
+        const laneGap = 10;
+        const layoutLaneCounts = new Map();
+        const layoutEvents = events.map((event) => {
+          const catIndex = Math.max(0, categories.indexOf(event.category));
+          const colorIndex = Math.max(0, colorGroups.indexOf(event.colorName));
+          const y = yForTime(new Date(event.at).getTime());
+          const laneKey = `${event.parentId || event.noteId}:${Math.round(y / 28)}`;
+          const laneIndex = layoutLaneCounts.get(laneKey) || 0;
+          layoutLaneCounts.set(laneKey, laneIndex + 1);
+          return { event, catIndex, colorIndex, y, laneIndex };
+        });
+        const maxCatIndex = Math.max(0, ...layoutEvents.map(item => item.catIndex));
+        const maxColorLane = Math.max(0, ...layoutEvents.map(item => item.colorIndex * colorGap + (item.event.parentId ? 76 + (item.event.childIndex || 0) * childGap : 0) + item.laneIndex * laneGap));
+        const planeWidth = Math.max(760, maxCatIndex * categoryGap + 560);
+        const planeDepth = Math.max(520, maxColorLane + 430);
         const planeY = -300;
         const centimeter = 20;
         const originX = -planeWidth / 2;
         const originZ = 160 - planeDepth / 2;
         const axisY = planeY + 8;
         const categoryStartX = originX + 220;
-        const colorStartZ = originZ + 210;
+        const colorStartZ = originZ + 180;
         const xAxisEnd = planeWidth / 2 - 90;
         const zAxisEnd = 160 + planeDepth / 2 - 90;
 
@@ -3625,7 +3778,7 @@
         });
 
         colorGroups.forEach((colorGroup, index) => {
-          const z = colorStartZ + index * 150;
+          const z = colorStartZ + index * colorGap;
           const label = makeLabel(THREE, colorGroup, "色奥行き", "");
           label.position.set(originX - 108, axisY + 46, z);
           label.rotation.x = -Math.PI / 7;
@@ -3656,17 +3809,10 @@
           scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .55 })));
         });
 
-        const laneCounts = new Map();
-        events.forEach((event, index) => {
-          const catIndex = Math.max(0, categories.indexOf(event.category));
+        layoutEvents.forEach(({ event, catIndex, colorIndex, y, laneIndex }) => {
           const x = categoryStartX + catIndex * categoryGap;
-          const y = yForTime(new Date(event.at).getTime());
-          const laneKey = `${event.parentId || event.noteId}:${Math.round(y / 28)}`;
-          const laneIndex = laneCounts.get(laneKey) || 0;
-          laneCounts.set(laneKey, laneIndex + 1);
-          const colorIndex = Math.max(0, colorGroups.indexOf(event.colorName));
-          const hierarchyOffset = event.parentId ? 76 + (event.childIndex || 0) * 62 : 0;
-          const z = colorStartZ + colorIndex * 150 + hierarchyOffset + laneIndex * 16;
+          const hierarchyOffset = event.parentId ? 76 + (event.childIndex || 0) * childGap : 0;
+          const z = colorStartZ + colorIndex * colorGap + hierarchyOffset + laneIndex * laneGap;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
