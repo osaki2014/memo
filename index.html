@@ -242,7 +242,8 @@
       position: sticky;
       top: 58px;
       left: 10px;
-      z-index: 24;
+      z-index: 80;
+      pointer-events: auto;
       width: fit-content;
       display: flex;
       align-items: center;
@@ -267,6 +268,7 @@
 
     .view-cube {
       position: relative;
+      z-index: 90;
       width: 106px;
       height: 106px;
       border-radius: 10px;
@@ -630,7 +632,8 @@
     .note-body {
       min-height: 0;
       display: grid;
-      grid-template-rows: auto auto minmax(38px, 1fr) auto;
+      grid-template-rows: auto auto auto;
+      align-content: start;
       gap: 6px;
       overflow: hidden;
     }
@@ -654,11 +657,11 @@
 
     .child-notes {
       position: relative;
-      margin: 4px 0 8px;
-      min-height: 38px;
+      margin: 0;
+      min-height: 0;
       height: var(--child-area-height, 190px);
       max-height: none;
-      overflow: auto;
+      overflow: visible;
       border-radius: 8px;
     }
 
@@ -669,10 +672,10 @@
       border: 2px solid transparent;
       border-radius: 7px;
       background: rgba(255,255,255,.58);
-      padding: 10px;
+      padding: 8px;
       display: grid;
       grid-template-rows: auto auto auto minmax(0, 1fr);
-      gap: 7px;
+      gap: 5px;
       overflow: hidden;
     }
 
@@ -746,7 +749,7 @@
 
     .note > .note-body > .child-notes {
       height: auto;
-      min-height: 38px;
+      min-height: 0;
     }
 
     .child-actions button {
@@ -1879,9 +1882,17 @@
     }
 
     function wireTag3DControls() {
-      el.canvas.querySelectorAll("[data-view]").forEach(button => {
-        button.addEventListener("click", () => {
-          setTag3DView(button.dataset.view);
+      el.canvas.querySelectorAll("[data-view],[data-hit-view]").forEach(button => {
+        const readView = () => button.dataset.view || button.dataset.hitView;
+        button.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setTag3DView(readView());
+        });
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setTag3DView(readView());
         });
       });
       const cube = el.canvas.querySelector(".view-cube");
@@ -2272,6 +2283,11 @@
       const query = el.searchInput.value.trim().toLowerCase();
       const isTag3D = boardMode === "3d";
       harmonizeChildColors();
+      let fittedAny = false;
+      state.notes.filter(note => !note.parentId).forEach(parent => {
+        fittedAny = ensureParentFitsChildren(parent) || fittedAny;
+      });
+      if (fittedAny) persist();
       if (!isTag3D && !skipAutoResolveOnce) resolveRootOverlaps(null, 1);
       skipAutoResolveOnce = false;
       const notes = [...state.notes]
@@ -2985,9 +3001,9 @@
     }
 
     function childAreaHeight(children) {
-      if (children.length === 0) return 46;
+      if (children.length === 0) return 0;
       const bottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
-      return Math.max(160, bottom + 24);
+      return Math.max(0, bottom + 4);
     }
 
     function childVisualHeight(child) {
@@ -3003,18 +3019,34 @@
       if (!parent || parent.parentId) return false;
       const children = childNotes(parent.id);
       if (!children.length) return false;
+      const compacted = compactChildCluster(children);
       const childRight = Math.max(...children.map(child => (child.localX || 8) + childVisualWidth(child)));
       const childBottom = Math.max(...children.map(child => (child.localY || 8) + childVisualHeight(child)));
-      const neededW = Math.max(parent.w || 260, childRight + 46);
-      const textReserve = Number.parseFloat(parent.textHeight || "") || Math.min(96, maxTextHeightForNote({ ...parent, h: parent.h || 188 }));
-      const neededH = Math.max(parent.h || 188, 118 + textReserve + childBottom + 48);
-      const changed = neededW !== parent.w || neededH !== parent.h;
+      const neededW = Math.max(parent.w || 260, childRight + 28);
+      const textReserve = Number.parseFloat(parent.textHeight || "") || defaultTextHeight(parent, maxTextHeightForNote(parent));
+      const chromeReserve = 82;
+      const neededH = Math.max(parent.h || 188, chromeReserve + textReserve + childBottom + 18);
+      const changed = compacted || neededW !== parent.w || neededH !== parent.h;
       if (changed) {
         parent.w = Math.min(1400, neededW);
         parent.h = Math.min(1300, neededH);
         autoFitNoteInternals(parent);
       }
       return changed;
+    }
+
+    function compactChildCluster(children) {
+      if (!children.length) return false;
+      const minX = Math.min(...children.map(child => child.localX || 8));
+      const minY = Math.min(...children.map(child => child.localY || 8));
+      const dx = minX > 10 ? minX - 8 : 0;
+      const dy = minY > 10 ? minY - 8 : 0;
+      if (!dx && !dy) return false;
+      children.forEach(child => {
+        child.localX = Math.max(0, (child.localX || 8) - dx);
+        child.localY = Math.max(0, (child.localY || 8) - dy);
+      });
+      return true;
     }
 
     function toggleCollapsed(note) {
@@ -3682,7 +3714,10 @@
           return { event, catIndex, colorIndex, y, laneIndex };
         });
         const maxCatIndex = Math.max(0, ...layoutEvents.map(item => item.catIndex));
-        const maxColorLane = Math.max(0, ...layoutEvents.map(item => item.colorIndex * colorGap + (item.event.parentId ? 76 + (item.event.childIndex || 0) * childGap : 0) + item.laneIndex * laneGap));
+        const maxColorLane = Math.max(0, ...layoutEvents.map(item => {
+          if (!item.event.parentId) return item.laneIndex * laneGap;
+          return item.colorIndex * colorGap + 76 + (item.event.childIndex || 0) * childGap + item.laneIndex * laneGap;
+        }));
         const planeWidth = Math.max(760, maxCatIndex * categoryGap + 560);
         const planeDepth = Math.max(520, maxColorLane + 430);
         const planeY = -300;
@@ -3812,7 +3847,9 @@
         layoutEvents.forEach(({ event, catIndex, colorIndex, y, laneIndex }) => {
           const x = categoryStartX + catIndex * categoryGap;
           const hierarchyOffset = event.parentId ? 76 + (event.childIndex || 0) * childGap : 0;
-          const z = colorStartZ + colorIndex * colorGap + hierarchyOffset + laneIndex * laneGap;
+          const z = event.parentId
+            ? colorStartZ + colorIndex * colorGap + hierarchyOffset + laneIndex * laneGap
+            : colorStartZ + laneIndex * laneGap;
           const card = makeEvent3DCard(THREE, event);
           card.position.set(x, y, z);
           scene.add(card);
