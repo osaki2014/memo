@@ -212,9 +212,13 @@
       max-height: 128px;
       color: var(--ink);
       line-height: 1.22;
-      font-size: 12px;
+      font-size: var(--note-font-size, 12px);
+      font-family: var(--note-font-family, system-ui, sans-serif);
       outline: none;
       overflow: auto;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      resize: horizontal;
     }
 
     .markdown-preview h1,
@@ -269,6 +273,12 @@
       background: transparent;
       box-shadow: none;
       transform-style: preserve-3d;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .view-cube.dragging {
+      cursor: grabbing;
     }
 
     .view-cube button {
@@ -393,6 +403,13 @@
       outline-offset: 3px;
     }
 
+    .note.move-source,
+    .child-note.move-source {
+      outline: 2px dashed var(--accent);
+      outline-offset: 6px;
+      box-shadow: 0 0 0 6px rgba(26,115,232,.08), var(--shadow);
+    }
+
     .note {
       position: absolute;
       width: 260px;
@@ -410,6 +427,37 @@
       cursor: default;
     }
 
+    .note-resize {
+      position: absolute;
+      right: 3px;
+      bottom: 3px;
+      width: 18px;
+      height: 18px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: nwse-resize;
+      z-index: 5;
+    }
+
+    .note-resize::before,
+    .note-resize::after {
+      content: "";
+      position: absolute;
+      right: 2px;
+      bottom: 3px;
+      width: 12px;
+      border-bottom: 1px solid rgba(60,64,67,.48);
+      transform: rotate(-45deg);
+      transform-origin: right bottom;
+    }
+
+    .note-resize::after {
+      right: 2px;
+      bottom: 8px;
+      width: 8px;
+    }
+
     .note.edge-drag {
       cursor: grab;
     }
@@ -423,6 +471,7 @@
 
     .note.collapsed .note-meta,
     .note.collapsed textarea,
+    .note.collapsed .markdown-preview,
     .note.collapsed .note-body {
       display: none;
     }
@@ -456,29 +505,6 @@
       gap: 6px;
       cursor: grab;
       min-height: 26px;
-      padding-right: 18px;
-    }
-
-    .note-move {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      padding: 0;
-      border-radius: 6px;
-      border: 1px solid var(--line);
-      cursor: grab;
-      color: var(--muted);
-      background: rgba(255,255,255,.48);
-      user-select: none;
-      touch-action: none;
-    }
-
-    .note-move:active,
-    .note.dragging .note-move {
-      cursor: grabbing;
     }
 
     .note-title {
@@ -490,6 +516,22 @@
       color: var(--ink);
       outline: none;
       font-size: 13px;
+    }
+
+    .head-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: auto;
+    }
+
+    .head-actions button {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      padding: 0;
+      justify-content: center;
+      background: rgba(255,255,255,.66);
     }
 
     .note-meta {
@@ -535,14 +577,24 @@
       width: 100%;
       min-height: 56px;
       max-height: 128px;
-      border: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
       outline: none;
-      resize: none;
+      resize: horizontal;
       background: transparent;
       color: var(--ink);
       line-height: 1.22;
-      font-size: 12px;
+      font-size: var(--note-font-size, 12px);
+      font-family: var(--note-font-family, system-ui, sans-serif);
       overflow: auto;
+    }
+
+    .note textarea:hover,
+    .note textarea:focus,
+    .markdown-preview:hover,
+    .markdown-preview:focus {
+      border-color: rgba(60,64,67,.18);
+      background: rgba(255,255,255,.16);
     }
 
     .note-body {
@@ -615,21 +667,9 @@
 
     .child-head {
       display: grid;
-      grid-template-columns: 18px 1fr;
+      grid-template-columns: 1fr auto;
       align-items: center;
       gap: 5px;
-    }
-
-    .child-move {
-      width: 18px;
-      height: 18px;
-      border: 0;
-      border-radius: 9px;
-      padding: 0;
-      justify-content: center;
-      background: rgba(255,255,255,.66);
-      cursor: grab;
-      color: var(--muted);
     }
 
     .child-note.selected {
@@ -654,16 +694,20 @@
     .child-note textarea {
       min-height: 34px;
       max-height: 72px;
-      font-size: 11px;
+      font-size: var(--note-font-size, 11px);
+      font-family: var(--note-font-family, system-ui, sans-serif);
       line-height: 1.2;
-      resize: none;
+      resize: horizontal;
       overflow: auto;
+      border: 1px solid transparent;
+      border-radius: 5px;
     }
 
     .child-note .markdown-preview {
       min-height: 34px;
       max-height: 72px;
-      font-size: 11px;
+      font-size: var(--note-font-size, 11px);
+      font-family: var(--note-font-family, system-ui, sans-serif);
       line-height: 1.2;
     }
 
@@ -710,6 +754,74 @@
       padding: 0;
       justify-content: center;
       background: rgba(255,255,255,.72);
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 100;
+      min-width: 180px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.96);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 3px;
+    }
+
+    .context-menu button,
+    .context-menu label {
+      height: 32px;
+      border: 0;
+      border-radius: 6px;
+      justify-content: flex-start;
+      background: transparent;
+      padding: 0 9px;
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    .context-menu button:hover,
+    .context-menu label:hover {
+      background: rgba(26,115,232,.08);
+    }
+
+    .context-menu select {
+      width: 100%;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .move-arrow {
+      position: absolute;
+      z-index: 60;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    .move-arrow-line {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 0;
+      border-top: 2px dashed var(--accent);
+      transform-origin: 0 0;
+    }
+
+    .move-arrow-line::after {
+      content: "";
+      position: absolute;
+      right: -2px;
+      top: -6px;
+      border-left: 9px solid var(--accent);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
     }
 
     .side {
@@ -1160,6 +1272,11 @@
     let markdownPreview = false;
     let lastTag3DClick = null;
     let boardZoom = 1;
+    let selectedRootIds = new Set();
+    let contextMenuEl = null;
+    let textMenuEl = null;
+    let moveCommand = null;
+    let viewCubeDrag = null;
 
     const el = {
       app: document.getElementById("app"),
@@ -1382,7 +1499,25 @@
       toast("画像を貼り込みました");
     });
 
+    document.addEventListener("pointerdown", (event) => {
+      if (moveCommand) {
+        finishCommandMove(event);
+        return;
+      }
+      if (!event.target.closest(".context-menu")) {
+        closeContextMenus();
+      }
+    }, true);
+
+    document.addEventListener("pointermove", (event) => {
+      if (moveCommand) updateMoveArrow(event.clientX, event.clientY);
+    });
+
     window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        cancelCommandMove();
+        closeContextMenus();
+      }
       if (event.key === "Escape" && el.imageModal.classList.contains("open")) closeImageModal();
       if (event.key === "Escape" && el.timelineOverlay.classList.contains("open")) closeTimeline();
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
@@ -1416,7 +1551,10 @@
         localX: Number.isFinite(note.localX) ? note.localX : 8,
         localY: Number.isFinite(note.localY) ? note.localY : 8,
         w: note.w || 260,
-        h: note.h || 188
+        h: note.h || 188,
+        textSize: note.textSize || "",
+        textFont: note.textFont || "",
+        textWidth: note.textWidth || ""
       };
     }
 
@@ -1478,6 +1616,10 @@
     }
 
     function createChildNote(parent) {
+      if (parent.parentId) {
+        toast("子付箋の中には子付箋を作れません。");
+        return null;
+      }
       const child = createNote({
         parentId: parent.id,
         title: "子メモ",
@@ -1718,10 +1860,85 @@
     function wireTag3DControls() {
       el.canvas.querySelectorAll("[data-view]").forEach(button => {
         button.addEventListener("click", () => {
-          tag3dView = button.dataset.view;
-          renderNotes();
+          setTag3DView(button.dataset.view);
         });
       });
+      const cube = el.canvas.querySelector(".view-cube");
+      const shell = el.canvas.querySelector(".view-cube-shell");
+      if (!cube || !shell) return;
+      cube.addEventListener("click", (event) => {
+        if (viewCubeDrag) return;
+        const view = viewFromCubePoint(cube, event.clientX, event.clientY);
+        if (view) setTag3DView(view);
+      }, true);
+      cube.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("[data-view]")) return;
+        event.preventDefault();
+        cube.setPointerCapture(event.pointerId);
+        cube.classList.add("dragging");
+        viewCubeDrag = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          yaw: Number(cube.dataset.yaw || 38),
+          pitch: Number(cube.dataset.pitch || -26)
+        };
+      });
+      cube.addEventListener("pointermove", (event) => {
+        if (!viewCubeDrag || event.pointerId !== viewCubeDrag.pointerId) return;
+        const yaw = viewCubeDrag.yaw + (event.clientX - viewCubeDrag.startX) * .6;
+        const pitch = Math.max(-82, Math.min(82, viewCubeDrag.pitch - (event.clientY - viewCubeDrag.startY) * .45));
+        cube.dataset.yaw = String(yaw);
+        cube.dataset.pitch = String(pitch);
+        shell.style.transform = `rotateX(${pitch}deg) rotateY(${yaw}deg)`;
+        rotateTag3DViewFromCube(yaw, pitch);
+      });
+      const finish = () => {
+        cube.classList.remove("dragging");
+        viewCubeDrag = null;
+      };
+      cube.addEventListener("pointerup", finish);
+      cube.addEventListener("pointercancel", finish);
+    }
+
+    function setTag3DView(view) {
+      tag3dView = view || "front";
+      el.canvas.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === tag3dView));
+      if (tag3dRuntime?.camera) {
+        setTag3DCamera(tag3dRuntime.camera);
+        tag3dRuntime.controls?.target.set(0, -120, 60);
+        tag3dRuntime.controls?.update();
+        tag3dRuntime.renderFrame?.();
+      } else {
+        renderNotes();
+      }
+    }
+
+    function viewFromCubePoint(cube, clientX, clientY) {
+      const rect = cube.getBoundingClientRect();
+      const x = (clientX - rect.left) / rect.width;
+      const y = (clientY - rect.top) / rect.height;
+      if (y < .33) return "top";
+      if (y > .68) return "bottom";
+      if (x < .34) return "left";
+      if (x > .68) return "right";
+      return "front";
+    }
+
+    function rotateTag3DViewFromCube(yaw, pitch) {
+      const runtime = tag3dRuntime;
+      if (!runtime) return;
+      const radius = 1500;
+      const yawRad = yaw * Math.PI / 180;
+      const pitchRad = pitch * Math.PI / 180;
+      const x = Math.sin(yawRad) * Math.cos(pitchRad) * radius;
+      const y = -120 + Math.sin(-pitchRad) * radius;
+      const z = Math.cos(yawRad) * Math.cos(pitchRad) * radius;
+      runtime.camera.position.set(x, y, z);
+      runtime.camera.lookAt(0, -120, 60);
+      runtime.controls?.target.set(0, -120, 60);
+      runtime.controls?.update();
+      runtime.renderFrame?.();
     }
 
     function renderTags(note) {
@@ -1729,25 +1946,46 @@
     }
 
     function renderMarkdownBody(note, scope) {
+      const textWidth = note.textWidth ? ` style="width:${escapeAttr(note.textWidth)}"` : "";
       if (markdownPreview) {
-        return `<div class="markdown-preview ${scope}-text" contenteditable="true" aria-label="本文プレビュー">${markdownToHtml(note.text)}</div>`;
+        return `<div class="markdown-preview ${scope}-text" contenteditable="true" aria-label="本文プレビュー"${textWidth}>${markdownToHtml(note.text)}</div>`;
       }
-      return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く">${escapeHtml(note.text)}</textarea>`;
+      return `<textarea class="${scope}-text" aria-label="本文" placeholder="メモを書く"${textWidth}>${escapeHtml(note.text)}</textarea>`;
     }
 
     function wireMarkdownBody(scope, note) {
       const preview = scope.querySelector(".markdown-preview");
       if (preview) {
+        preview.addEventListener("contextmenu", (event) => {
+          if (hasTextSelection(preview)) openTextContextMenu(event, note, preview);
+        });
+        preview.addEventListener("mouseup", () => rememberTextFieldWidth(note, preview));
         preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
         return;
       }
       const textarea = scope.querySelector("textarea");
       if (!textarea) return;
+      textarea.addEventListener("contextmenu", (event) => {
+        if (hasTextSelection(textarea)) openTextContextMenu(event, note, textarea);
+      });
       textarea.addEventListener("input", () => {
         textarea.style.height = "auto";
         textarea.style.height = `${textarea.scrollHeight}px`;
       });
+      textarea.addEventListener("mouseup", () => rememberTextFieldWidth(note, textarea));
       textarea.addEventListener("change", () => updateNoteText(note, textarea.value));
+    }
+
+    function rememberTextFieldWidth(note, field) {
+      const width = Math.round(field.getBoundingClientRect().width / boardZoom);
+      const defaultWidth = note.parentId ? 174 : Math.max(180, (note.w || 260) - 28);
+      if (Math.abs(width - defaultWidth) < 6) {
+        if (!note.textWidth) return;
+        note.textWidth = "";
+      } else {
+        note.textWidth = `${Math.max(90, Math.min(520, width))}px`;
+      }
+      persist();
     }
 
     function updateNoteText(note, value) {
@@ -1908,18 +2146,26 @@
       notes.forEach(note => {
         const children = childNotes(note.id);
         const card = document.createElement("article");
-        card.className = `note${note.id === selectedId ? " selected" : ""}${note.pinned ? " pinned" : ""}${note.collapsed ? " collapsed" : ""}`;
+        const isSelected = note.id === selectedId || selectedRootIds.has(note.id);
+        card.className = `note${isSelected ? " selected" : ""}${note.pinned ? " pinned" : ""}${note.collapsed ? " collapsed" : ""}`;
         card.style.left = `${note.x}px`;
         card.style.top = `${note.y}px`;
         card.style.width = `${note.w || 260}px`;
         card.style.height = `${note.h || 188}px`;
         card.style.background = note.color;
+        card.style.setProperty("--note-font-size", note.textSize || "12px");
+        card.style.setProperty("--note-font-family", note.textFont || "system-ui, sans-serif");
         card.style.setProperty("--z", `${note.depth || 0}px`);
         card.dataset.id = note.id;
         card.innerHTML = `
           <div class="note-head">
-            <span class="note-move" title="メモを移動" role="button" tabindex="0">${iconMove()}</span>
             <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
+            <span class="head-actions">
+              <button class="pin" title="ピン留め">${iconPin()}</button>
+              <button class="image" title="画像を追加">${iconImage()}</button>
+              <button class="history" title="このメモの履歴">${iconHistory()}</button>
+              <button class="delete" title="削除">${iconTrash()}</button>
+            </span>
           </div>
           <div class="note-meta">${formatDate(note.createdAt)} 作成 / ${formatDate(note.updatedAt)} 更新</div>
           ${renderMarkdownBody(note, "note")}
@@ -1927,16 +2173,8 @@
             <div class="tag-row">${renderTags(note)}</div>
             <div class="note-images">${note.images.map(src => `<img src="${src}" alt="貼り込んだ画像">`).join("")}</div>
             <div class="child-notes" style="--child-area-height:${childAreaHeight(children)}px">${children.map(child => renderChildNote(child)).join("")}</div>
-            <div class="note-actions">
-              <span>
-                <button class="pin" title="ピン留め">${iconPin()}</button>
-                <button class="image" title="画像を追加">${iconImage()}</button>
-                <button class="add-child" title="子メモを追加">${iconNested()}</button>
-                <button class="history" title="このメモの履歴">${iconHistory()}</button>
-              </span>
-              <button class="delete" title="削除">${iconTrash()}</button>
-            </div>
           </div>
+          <button class="note-resize" title="付箋を拡大縮小" aria-label="付箋を拡大縮小"></button>
         `;
 
         card.addEventListener("pointerdown", (event) => {
@@ -1944,10 +2182,16 @@
             startDrag(event, note, card);
             return;
           }
-          selectedId = note.id;
+          if (event.ctrlKey || event.metaKey) {
+            selectedRootIds.has(note.id) ? selectedRootIds.delete(note.id) : selectedRootIds.add(note.id);
+            selectedId = note.id;
+          } else {
+            selectedRootIds.clear();
+            selectedId = note.id;
+          }
           persist();
           renderSidePanel();
-          document.querySelectorAll(".note").forEach(n => n.classList.toggle("selected", n.dataset.id === selectedId));
+          document.querySelectorAll(".note").forEach(n => n.classList.toggle("selected", n.dataset.id === selectedId || selectedRootIds.has(n.dataset.id)));
         });
         card.addEventListener("mousemove", (event) => {
           card.classList.toggle("edge-drag", isNoteEdgePointer(event, card));
@@ -1956,11 +2200,11 @@
 
         const head = card.querySelector(".note-head");
         head.addEventListener("pointerdown", (event) => startDrag(event, note, card));
-        card.querySelector(".note-move").addEventListener("pointerdown", (event) => startDrag(event, note, card));
         head.addEventListener("mousedown", (event) => startMouseDrag(event, note, card));
-        card.querySelector(".note-move").addEventListener("mousedown", (event) => startMouseDrag(event, note, card));
+        card.querySelector(".note-resize").addEventListener("pointerdown", (event) => startNoteResize(event, note, card));
+        card.addEventListener("contextmenu", (event) => openNoteContextMenu(event, note));
         card.addEventListener("dblclick", (event) => {
-          if (event.target.closest("button,textarea,.note-move")) return;
+          if (event.target.closest("button,textarea")) return;
           toggleCollapsed(note);
         });
         wireNoteTagDrop(card, note);
@@ -1989,11 +2233,6 @@
           event.stopPropagation();
           imageTargetId = note.id;
           el.imageInput.click();
-        });
-
-        card.querySelector(".add-child").addEventListener("click", (event) => {
-          event.stopPropagation();
-          createChildNote(note);
         });
 
         card.querySelector(".history").addEventListener("click", (event) => {
@@ -2039,25 +2278,19 @@
     }
 
     function renderChildNote(child) {
-      const grandchildren = childNotes(child.id);
       return `
-        <section class="child-note${child.id === selectedId ? " selected" : ""}${child.collapsed ? " collapsed" : ""}" data-child-id="${child.id}" style="left:${child.localX || 8}px; top:${child.localY || 8}px; background:${child.color}">
+        <section class="child-note${child.id === selectedId ? " selected" : ""}${child.collapsed ? " collapsed" : ""}" data-child-id="${child.id}" style="left:${child.localX || 8}px; top:${child.localY || 8}px; background:${child.color}; --note-font-size:${child.textSize || "11px"}; --note-font-family:${child.textFont || "system-ui, sans-serif"}">
           <div class="child-head">
-            <button class="child-move" title="親メモ内で移動">${iconMove()}</button>
             <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
+            <span class="head-actions">
+              <button class="child-select" title="選択">${iconSelect()}</button>
+              <button class="child-image" title="画像を追加">${iconImage()}</button>
+              <button class="child-delete" title="削除">${iconTrash()}</button>
+            </span>
           </div>
           ${renderMarkdownBody(child, "child")}
           <div class="tag-row child-tags">${renderTags(child)}</div>
-          <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件 / 子 ${grandchildren.length} 件</div>
-          <div class="child-actions">
-            <span>
-              <button class="child-select" title="選択">${iconSelect()}</button>
-              <button class="child-image" title="画像を追加">${iconImage()}</button>
-              <button class="child-add" title="さらに子メモを追加">${iconNested()}</button>
-            </span>
-            <button class="child-delete" title="削除">${iconTrash()}</button>
-          </div>
-          <div class="child-notes" style="--child-area-height:${childAreaHeight(grandchildren)}px">${grandchildren.map(grandchild => renderChildNote(grandchild)).join("")}</div>
+          <div class="child-meta">${formatDate(child.createdAt)} 作成 / 画像 ${child.images.length} 件</div>
         </section>
       `;
     }
@@ -2080,14 +2313,15 @@
           event.stopPropagation();
           toggleCollapsed(child);
         });
+        childCard.addEventListener("contextmenu", (event) => openNoteContextMenu(event, child));
         wireNoteTagDrop(childCard, child);
 
         childCard.querySelector(".child-head").addEventListener("pointerdown", (event) => {
-          if (event.target.closest("input")) return;
+          if (event.target.closest("input,button")) return;
           startChildDrag(event, child, childCard);
         });
         childCard.querySelector(".child-head").addEventListener("mousedown", (event) => {
-          if (event.target.closest("input")) return;
+          if (event.target.closest("input,button")) return;
           startChildMouseDrag(event, child, childCard);
         });
 
@@ -2116,11 +2350,6 @@
           event.stopPropagation();
           imageTargetId = child.id;
           el.imageInput.click();
-        });
-
-        childCard.querySelector(".child-add").addEventListener("click", (event) => {
-          event.stopPropagation();
-          createChildNote(child);
         });
 
         childCard.querySelector(".child-delete").addEventListener("click", (event) => {
@@ -2214,9 +2443,292 @@
       });
     }
 
+    function openNoteContextMenu(event, note) {
+      const textTarget = event.target.closest("textarea,.markdown-preview");
+      if (textTarget && hasTextSelection(textTarget)) {
+        openTextContextMenu(event, note, textTarget);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closeContextMenus();
+      const isRoot = !note.parentId;
+      if (isRoot && (event.ctrlKey || event.metaKey)) {
+        selectedRootIds.add(note.id);
+      } else if (isRoot && !selectedRootIds.has(note.id)) {
+        selectedRootIds.clear();
+        selectedRootIds.add(note.id);
+      }
+      selectedId = note.id;
+      const moveIds = isRoot ? [...selectedRootIds] : [note.id];
+      const menu = document.createElement("div");
+      menu.className = "context-menu";
+      menu.style.left = `${event.clientX}px`;
+      menu.style.top = `${event.clientY}px`;
+      menu.innerHTML = `
+        <button data-action="move">${iconMove()} 移動先を指示</button>
+        ${isRoot ? `<button data-action="pin">${iconPin()} ${note.pinned ? "ピン解除" : "ピン留め"}</button>` : ""}
+        <button data-action="image">${iconImage()} 画像を追加</button>
+        <button data-action="history">${iconHistory()} 履歴を表示</button>
+        <button data-action="delete">${iconTrash()} 削除</button>
+      `;
+      menu.addEventListener("click", (clickEvent) => {
+        const action = clickEvent.target.closest("[data-action]")?.dataset.action;
+        if (!action) return;
+        clickEvent.stopPropagation();
+        if (action === "move") {
+          startCommandMove(moveIds, note.parentId ? "child" : "root", event.clientX, event.clientY);
+        } else if (action === "pin") {
+          moveIds.map(findNote).filter(Boolean).forEach(item => {
+            item.pinned = !item.pinned;
+            item.updatedAt = now();
+            recordEvent(item, "full", item.pinned ? "ピン留め" : "ピン解除", item.title);
+          });
+          persist();
+          render();
+        } else if (action === "image") {
+          imageTargetId = note.id;
+          el.imageInput.click();
+        } else if (action === "history") {
+          selectedId = note.id;
+          historyMode = "selected";
+          el.app.classList.remove("side-collapsed");
+          el.tabSelected.classList.add("active");
+          el.tabAll.classList.remove("active");
+          el.tabTree.classList.remove("active");
+          persist();
+          render();
+        } else if (action === "delete") {
+          moveIds.forEach(deleteNoteTree);
+          selectedRootIds.clear();
+          persist();
+          render();
+          toast(`${moveIds.length} 件のメモを削除しました`);
+        }
+        closeContextMenus();
+      });
+      document.body.appendChild(menu);
+      contextMenuEl = menu;
+      renderNotes();
+    }
+
+    function hasTextSelection(target) {
+      if (target.tagName === "TEXTAREA") return target.selectionStart !== target.selectionEnd;
+      const selection = window.getSelection();
+      return Boolean(selection && !selection.isCollapsed && target.contains(selection.anchorNode));
+    }
+
+    function openTextContextMenu(event, note) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeContextMenus();
+      const menu = document.createElement("div");
+      menu.className = "context-menu";
+      menu.style.left = `${event.clientX}px`;
+      menu.style.top = `${event.clientY}px`;
+      menu.innerHTML = `
+        <label>文字サイズ
+          <select data-text-size>
+            <option value="">標準</option>
+            <option value="11px">小</option>
+            <option value="13px">中</option>
+            <option value="16px">大</option>
+            <option value="20px">特大</option>
+          </select>
+        </label>
+        <label>フォント
+          <select data-text-font>
+            <option value="">標準</option>
+            <option value="system-ui, sans-serif">Sans</option>
+            <option value="serif">Serif</option>
+            <option value="monospace">Mono</option>
+          </select>
+        </label>
+      `;
+      const sizeSelect = menu.querySelector("[data-text-size]");
+      const fontSelect = menu.querySelector("[data-text-font]");
+      sizeSelect.value = note.textSize || "";
+      fontSelect.value = note.textFont || "";
+      const apply = () => {
+        note.textSize = sizeSelect.value;
+        note.textFont = fontSelect.value;
+        note.updatedAt = now();
+        recordEvent(note, "full", "文字設定更新", `${note.textSize || "標準"} / ${note.textFont || "標準"}`);
+        persist();
+        renderNotes();
+        closeContextMenus();
+      };
+      sizeSelect.addEventListener("change", apply);
+      fontSelect.addEventListener("change", apply);
+      document.body.appendChild(menu);
+      textMenuEl = menu;
+    }
+
+    function closeContextMenus() {
+      contextMenuEl?.remove();
+      textMenuEl?.remove();
+      contextMenuEl = null;
+      textMenuEl = null;
+    }
+
+    function startCommandMove(ids, kind, clientX, clientY) {
+      const uniqueIds = [...new Set(ids)].filter(id => findNote(id));
+      if (!uniqueIds.length) return;
+      moveCommand = {
+        ids: uniqueIds,
+        kind,
+        startClientX: clientX,
+        startClientY: clientY,
+        source: moveSourcePoint(uniqueIds)
+      };
+      markMoveSources(uniqueIds);
+      updateMoveArrow(clientX, clientY);
+      toast("移動先をクリックしてください。親付箋を指すと子付箋になります。");
+    }
+
+    function moveSourcePoint(ids) {
+      const rects = ids.map(noteElementRect).filter(Boolean);
+      if (!rects.length) return { x: 0, y: 0 };
+      const left = Math.min(...rects.map(rect => rect.left));
+      const top = Math.min(...rects.map(rect => rect.top));
+      const right = Math.max(...rects.map(rect => rect.right));
+      const bottom = Math.max(...rects.map(rect => rect.bottom));
+      const canvasRect = el.canvas.getBoundingClientRect();
+      return {
+        x: (left + right) / 2 - canvasRect.left,
+        y: (top + bottom) / 2 - canvasRect.top
+      };
+    }
+
+    function noteElementRect(id) {
+      const note = findNote(id);
+      const selector = note?.parentId ? `.child-note[data-child-id="${id}"]` : `.note[data-id="${id}"]`;
+      return document.querySelector(selector)?.getBoundingClientRect() || null;
+    }
+
+    function markMoveSources(ids) {
+      document.querySelectorAll(".move-source").forEach(item => item.classList.remove("move-source"));
+      ids.forEach(id => {
+        document.querySelector(`.note[data-id="${id}"], .child-note[data-child-id="${id}"]`)?.classList.add("move-source");
+      });
+    }
+
+    function updateMoveArrow(clientX, clientY) {
+      if (!moveCommand) return;
+      let arrow = el.canvas.querySelector(".move-arrow");
+      if (!arrow) {
+        arrow = document.createElement("div");
+        arrow.className = "move-arrow";
+        arrow.innerHTML = `<div class="move-arrow-line"></div>`;
+        el.canvas.appendChild(arrow);
+      }
+      const canvasRect = el.canvas.getBoundingClientRect();
+      const x1 = moveCommand.source.x;
+      const y1 = moveCommand.source.y;
+      const x2 = clientX - canvasRect.left;
+      const y2 = clientY - canvasRect.top;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.hypot(dx, dy);
+      arrow.style.left = `${x1}px`;
+      arrow.style.top = `${y1}px`;
+      const line = arrow.querySelector(".move-arrow-line");
+      line.style.width = `${length}px`;
+      line.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+      markCommandDropTarget(clientX, clientY);
+    }
+
+    function finishCommandMove(event) {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const command = moveCommand;
+      const parent = findCommandDropParent(command.ids, event.clientX, event.clientY);
+      if (parent) {
+        const blocked = command.ids.map(findNote).filter(note => note && !note.parentId && childNotes(note.id).length > 0);
+        if (blocked.length) {
+          toast("子付箋つきの親付箋は、別の親付箋の中へ入れられません。1世代だけに制限しています。");
+          cancelCommandMove();
+          return;
+        }
+        command.ids.forEach(id => {
+          const note = findNote(id);
+          if (note) adoptNoteIntoParent(note, parent, event.clientX, event.clientY);
+        });
+        persist();
+        render();
+        toast(`${command.ids.length} 件を ${parent.title} の中へ移動しました`);
+        moveCommand = null;
+        return;
+      }
+      moveCommandToBoard(command, event.clientX, event.clientY);
+      persist();
+      render();
+      toast("メモを移動しました");
+      moveCommand = null;
+    }
+
+    function moveCommandToBoard(command, clientX, clientY) {
+      const canvasRect = el.canvas.getBoundingClientRect();
+      const dx = (clientX - command.startClientX) / boardZoom;
+      const dy = (clientY - command.startClientY) / boardZoom;
+      command.ids.forEach(id => {
+        const note = findNote(id);
+        if (!note) return;
+        if (note.parentId) {
+          const parent = findNote(note.parentId);
+          const parentRect = document.querySelector(`.note[data-id="${note.parentId}"]`)?.getBoundingClientRect();
+          note.parentId = null;
+          note.x = parentRect ? Math.round((parentRect.left - canvasRect.left) / boardZoom + (note.localX || 8) + dx) : Math.max(0, note.x + dx);
+          note.y = parentRect ? Math.round((parentRect.top - canvasRect.top) / boardZoom + (note.localY || 8) + dy) : Math.max(0, note.y + dy);
+          note.w = 260;
+          note.h = 188;
+          if (parent) parent.updatedAt = now();
+        } else {
+          note.x = Math.max(0, (note.x || 0) + dx);
+          note.y = Math.max(0, (note.y || 0) + dy);
+        }
+        note.updatedAt = now();
+        recordEvent(note, "full", "メニュー移動", "作業面上で移動");
+      });
+      resolveRootOverlaps(null, 1);
+    }
+
+    function findCommandDropParent(ids, clientX, clientY) {
+      const elements = document.elementsFromPoint(clientX, clientY);
+      const target = elements
+        .map(element => element.closest?.(".note"))
+        .find(element => element && !ids.includes(element.dataset.id));
+      const parent = target ? findNote(target.dataset.id) : null;
+      if (!parent || parent.parentId) return null;
+      return parent;
+    }
+
+    function markCommandDropTarget(clientX, clientY) {
+      clearNoteDropTargets();
+      const parent = findCommandDropParent(moveCommand?.ids || [], clientX, clientY);
+      document.querySelector(`.note[data-id="${parent?.id}"]`)?.classList.add("drop-target");
+    }
+
+    function cancelCommandMove() {
+      if (!moveCommand) return;
+      moveCommand = null;
+      clearNoteDropTargets();
+      document.querySelectorAll(".move-source").forEach(item => item.classList.remove("move-source"));
+      el.canvas.querySelector(".move-arrow")?.remove();
+    }
+
     function adoptNoteIntoParent(child, parent, clientX, clientY) {
       if (!child || !parent || child.id === parent.id) return false;
       if (descendantIds(child.id).includes(parent.id)) return false;
+      if (childNotes(child.id).length > 0) {
+        toast("子付箋つきの付箋は、別の親付箋の中へ入れられません。");
+        return false;
+      }
+      if (parent.parentId) {
+        toast("子付箋の中に子付箋は作れません。親付箋へ移動してください。");
+        return false;
+      }
       const parentCard = document.querySelector(`.note[data-id="${parent.id}"], .child-note[data-child-id="${parent.id}"]`);
       const childArea = parentCard?.querySelector(".child-notes");
       const areaRect = childArea?.getBoundingClientRect() || parentCard?.getBoundingClientRect();
@@ -2333,8 +2845,7 @@
 
     function childVisualHeight(child) {
       if (child.collapsed) return 54;
-      const nested = childAreaHeight(childNotes(child.id));
-      return 138 + Math.min(260, nested);
+      return 138;
     }
 
     function toggleCollapsed(note) {
@@ -2346,6 +2857,7 @@
     }
 
     function startChildDrag(event, child, childCard) {
+      if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       childCard.setPointerCapture(event.pointerId);
@@ -2365,6 +2877,7 @@
     }
 
     function startChildMouseDrag(event, child, childCard) {
+      if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       childCard.classList.add("dragging");
@@ -2439,8 +2952,56 @@
       drag = null;
     }
 
+    function startNoteResize(event, note, card) {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      card.setPointerCapture(event.pointerId);
+      drag = {
+        id: note.id,
+        type: "note-resize",
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startW: note.w || card.offsetWidth || 260,
+        startH: note.h || card.offsetHeight || 188
+      };
+      card.classList.add("dragging");
+      card.addEventListener("pointermove", onNoteResize);
+      card.addEventListener("pointerup", endNoteResize, { once: true });
+      card.addEventListener("pointercancel", endNoteResize, { once: true });
+    }
+
+    function onNoteResize(event) {
+      if (!drag || drag.type !== "note-resize" || event.pointerId !== drag.pointerId) return;
+      const note = findNote(drag.id);
+      const card = document.querySelector(`.note[data-id="${drag.id}"]`);
+      if (!note || !card) return;
+      note.w = Math.max(220, Math.round(drag.startW + (event.clientX - drag.startX) / boardZoom));
+      note.h = Math.max(150, Math.round(drag.startH + (event.clientY - drag.startY) / boardZoom));
+      card.style.width = `${note.w}px`;
+      card.style.height = `${note.h}px`;
+    }
+
+    function endNoteResize(event) {
+      const card = drag ? document.querySelector(`.note[data-id="${drag.id}"]`) : null;
+      if (card) {
+        card.classList.remove("dragging");
+        card.removeEventListener("pointermove", onNoteResize);
+      }
+      const note = drag ? findNote(drag.id) : null;
+      if (note) {
+        note.updatedAt = now();
+        resolveRootOverlaps(null, 1);
+        persist();
+        render();
+      }
+      drag = null;
+    }
+
     function startDrag(event, note, card) {
-      if (!event.target.closest(".note-move") && !isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      if (event.button !== 0) return;
+      if (!isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       if (drag?.type === "note-mouse") return;
       event.preventDefault();
       event.stopPropagation();
@@ -2504,7 +3065,7 @@
 
     function startMouseDrag(event, note, card) {
       if (event.button !== 0) return;
-      if (!event.target.closest(".note-move") && !isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
+      if (!isNoteEdgePointer(event, card) && event.target.closest("input,button,textarea,.markdown-preview")) return;
       event.preventDefault();
       event.stopPropagation();
       card.classList.add("dragging");
@@ -2904,12 +3465,38 @@
         axisTitle.position.set(-planeWidth / 2 + 64, timeAxisMaxY + 46, -420);
         scene.add(axisTitle);
 
+        const xAxisY = planeY + 8;
+        const xAxisZ = -470;
+        const xAxis = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-planeWidth / 2 + 150, xAxisY, xAxisZ),
+          new THREE.Vector3(planeWidth / 2 - 150, xAxisY, xAxisZ)
+        ]);
+        scene.add(new THREE.Line(xAxis, new THREE.LineBasicMaterial({ color: 0xb6bbc2 })));
+        const xAxisLabel = makeLabel(THREE, el.classifySelect.value === "tag" ? "タグ分類" : "色分類", "水平軸", "");
+        xAxisLabel.position.set(0, xAxisY + 42, xAxisZ - 20);
+        scene.add(xAxisLabel);
+
+        const zAxisX = planeWidth / 2 - 170;
+        const zAxis = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(zAxisX, xAxisY, -430),
+          new THREE.Vector3(zAxisX, xAxisY, 420)
+        ]);
+        scene.add(new THREE.Line(zAxis, new THREE.LineBasicMaterial({ color: 0xb6bbc2 })));
+        const zAxisLabel = makeLabel(THREE, "色奥行き", "奥行き軸", "");
+        zAxisLabel.position.set(zAxisX - 44, xAxisY + 42, 450);
+        scene.add(zAxisLabel);
+
         categories.forEach((category, index) => {
           const x = categoryBaseX - ((categories.length - 1) * categoryGap) / 2 + index * categoryGap;
           const label = makeLabel(THREE, category, el.classifySelect.value === "tag" ? "タグ" : "色", "");
           label.position.set(x, planeY + 24, -390);
           label.rotation.x = -Math.PI / 7;
           scene.add(label);
+          const tickGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(x, xAxisY, xAxisZ - 18),
+            new THREE.Vector3(x, xAxisY, xAxisZ + 18)
+          ]);
+          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xc5c9cf })));
         });
 
         colorGroups.forEach((colorGroup, index) => {
@@ -2918,13 +3505,23 @@
           label.position.set(planeWidth / 2 - 210, planeY + 26, z);
           label.rotation.x = -Math.PI / 7;
           scene.add(label);
+          const tickGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(zAxisX - 18, xAxisY, z),
+            new THREE.Vector3(zAxisX + 18, xAxisY, z)
+          ]);
+          scene.add(new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0xc5c9cf })));
         });
 
-        buildTimeTicks(minTime, maxTime, 6).forEach(tick => {
+        buildTimeTicks(minTime, maxTime, 8).forEach(tick => {
           const y = yForTime(tick);
-          const label = makeLabel(THREE, formatAxisTime(tick), "時刻", "");
+          const label = makeAxisTickLabel(THREE, formatAxisTime(tick), "時刻");
           label.position.set(-planeWidth / 2 + 70, y, -430);
           scene.add(label);
+          const shortTick = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-planeWidth / 2 + 95, y, -420),
+            new THREE.Vector3(-planeWidth / 2 + 145, y, -420)
+          ]);
+          scene.add(new THREE.Line(shortTick, new THREE.LineBasicMaterial({ color: 0x9aa0a6 })));
           const tickGeo = new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(-planeWidth / 2 + 105, y, -420),
             new THREE.Vector3(planeWidth / 2 - 120, y, -420)
@@ -2966,16 +3563,18 @@
     async function loadThreeBundle() {
       const localUrl = new URL("./vendor/three/three.module.js", document.baseURI).href;
       const localControlsUrl = new URL("./vendor/three/examples/jsm/controls/OrbitControls.js", document.baseURI).href;
-      try {
-        const response = await fetch(localUrl, { method: "HEAD", cache: "no-store" });
-        const controlsResponse = await fetch(localControlsUrl, { method: "HEAD", cache: "no-store" });
-        if (response.ok && controlsResponse.ok) {
-          const THREE = await import(localUrl);
-          const { OrbitControls } = await import(localControlsUrl);
-          return { THREE, OrbitControls };
+      if (location.protocol !== "file:") {
+        try {
+          const response = await fetch(localUrl, { method: "HEAD", cache: "no-store" });
+          const controlsResponse = await fetch(localControlsUrl, { method: "HEAD", cache: "no-store" });
+          if (response.ok && controlsResponse.ok) {
+            const THREE = await import(localUrl);
+            const { OrbitControls } = await import(localControlsUrl);
+            return { THREE, OrbitControls };
+          }
+        } catch (error) {
+          // CDN fallback below keeps GitHub Pages builds working when vendor files are absent.
         }
-      } catch (error) {
-        // CDN fallback below keeps GitHub Pages builds working when vendor files are absent.
       }
       const THREE = await import("https://esm.sh/three@0.160.0");
       const { OrbitControls } = await import("https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js");
@@ -3078,26 +3677,26 @@
 
     function makeEvent3DCard(THREE, event) {
       const group = new THREE.Group();
-      const geometry = new THREE.BoxGeometry(240, 16, 104);
-      const material = new THREE.MeshStandardMaterial({
+      const geometry = new THREE.BoxGeometry(240, 6, 104);
+      const baseMaterial = new THREE.MeshStandardMaterial({
         color: new THREE.Color(event.color || "#fff8c7"),
         roughness: .58,
         metalness: .03
       });
-      const mesh = new THREE.Mesh(geometry, material);
+      const topMaterial = makeCardSurfaceMaterial(THREE, event);
+      const materials = [
+        baseMaterial,
+        baseMaterial.clone(),
+        topMaterial,
+        baseMaterial.clone(),
+        baseMaterial.clone(),
+        baseMaterial.clone()
+      ];
+      const mesh = new THREE.Mesh(geometry, materials);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.cardMesh = true;
       group.add(mesh);
-
-      const label = makeCardTextureLabel(THREE, {
-        title: `${typeLabel[event.type] || event.type}: ${event.noteTitle}`,
-        text: `${formatDate(event.at)} ${event.preview || ""}`,
-        tags: [event.category]
-      });
-      label.rotation.x = -Math.PI / 2;
-      label.position.set(0, 8.5, 0);
-      group.add(label);
 
       group.userData.event = event;
       group.userData.mesh = mesh;
@@ -3199,35 +3798,51 @@
 
     function setTag3DCardHighlight(card, active) {
       const mesh = card.userData?.mesh;
-      if (mesh?.material) {
-        mesh.material.emissive = active ? new tag3dRuntime.THREE.Color(0x1a73e8) : new tag3dRuntime.THREE.Color(0x000000);
-        mesh.material.emissiveIntensity = active ? .28 : 0;
-        mesh.material.needsUpdate = true;
-      }
+      const materials = Array.isArray(mesh?.material) ? mesh.material : [mesh?.material].filter(Boolean);
+      materials.forEach(material => {
+        if (!material) return;
+        material.emissive = active ? new tag3dRuntime.THREE.Color(0x1a73e8) : new tag3dRuntime.THREE.Color(0x000000);
+        material.emissiveIntensity = active ? .28 : 0;
+        material.needsUpdate = true;
+      });
       card.scale.setScalar(active ? 1.14 : 1);
     }
 
-    function makeCardTextureLabel(THREE, note) {
+    function makeCardSurfaceMaterial(THREE, event) {
       const canvas = document.createElement("canvas");
       canvas.width = 512;
-      canvas.height = 360;
+      canvas.height = 256;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "rgba(255,255,255,.0)";
+      ctx.fillStyle = event.color || "#fff8c7";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,.18)";
+      ctx.fillRect(0, 0, canvas.width, 256);
+      ctx.strokeStyle = "rgba(60,64,67,.10)";
+      ctx.lineWidth = 3;
+      for (let y = 58; y < canvas.height - 18; y += 24) {
+        ctx.beginPath();
+        ctx.moveTo(24, y);
+        ctx.lineTo(canvas.width - 24, y);
+        ctx.stroke();
+      }
       ctx.fillStyle = "#202124";
-      ctx.font = "bold 34px system-ui, sans-serif";
-      ctx.fillText(note.title.slice(0, 18), 30, 56);
+      ctx.font = "bold 28px system-ui, sans-serif";
+      ctx.fillText(`${typeLabel[event.type] || event.type}: ${event.noteTitle}`.slice(0, 24), 28, 48);
       ctx.fillStyle = "#5f6368";
-      ctx.font = "22px system-ui, sans-serif";
-      wrapCanvasText(ctx, note.text || "", 30, 102, 450, 30, 4);
+      ctx.font = "20px system-ui, sans-serif";
+      wrapCanvasText(ctx, `${formatDate(event.at)} ${event.preview || ""}`, 28, 84, 456, 26, 4);
       ctx.fillStyle = "#174ea6";
       ctx.font = "bold 20px system-ui, sans-serif";
-      ctx.fillText((note.tags || []).slice(0, 3).join("  "), 30, 318);
+      ctx.fillText(event.category || "", 28, 226);
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(226, 92), material);
-      return mesh;
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        color: 0xffffff,
+        roughness: .62,
+        metalness: .02
+      });
+      return material;
     }
 
     function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
@@ -3416,26 +4031,67 @@
 
     function makeLabel(THREE, line1, line2, line3) {
       const canvas = document.createElement("canvas");
-      canvas.width = 512;
-      canvas.height = 160;
+      canvas.width = 640;
+      canvas.height = 200;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "rgba(255,255,255,.88)";
-      roundRect(ctx, 8, 8, 496, 144, 18);
-      ctx.fill();
       ctx.fillStyle = "#111827";
-      ctx.font = "bold 28px system-ui, sans-serif";
-      ctx.fillText(line1 || "", 24, 50);
+      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.lineWidth = 7;
+      ctx.lineJoin = "round";
+      ctx.font = "bold 38px system-ui, sans-serif";
+      if (line1) {
+        ctx.strokeText(line1, 28, 64);
+        ctx.fillText(line1, 28, 64);
+      }
       ctx.fillStyle = "#374151";
-      ctx.font = "22px system-ui, sans-serif";
-      if (line2) ctx.fillText(line2.slice(0, 32), 24, 88);
+      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.lineWidth = 6;
+      ctx.font = "29px system-ui, sans-serif";
+      if (line2) {
+        const text = line2.slice(0, 32);
+        ctx.strokeText(text, 28, 112);
+        ctx.fillText(text, 28, 112);
+      }
       ctx.fillStyle = "#6b7280";
-      ctx.font = "18px system-ui, sans-serif";
-      if (line3) ctx.fillText(line3, 24, 122);
+      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.lineWidth = 5;
+      ctx.font = "24px system-ui, sans-serif";
+      if (line3) {
+        ctx.strokeText(line3, 28, 156);
+        ctx.fillText(line3, 28, 156);
+      }
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
       const sprite = new THREE.Sprite(material);
-      sprite.scale.set(112, 35, 1);
+      sprite.scale.set(154, 48, 1);
       return sprite;
+    }
+
+    function makeAxisTickLabel(THREE, line1, line2) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 384;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#5f6368";
+      ctx.strokeStyle = "rgba(255,255,255,.94)";
+      ctx.lineWidth = 7;
+      ctx.lineJoin = "round";
+      ctx.font = "bold 34px system-ui, sans-serif";
+      ctx.strokeText(line1 || "", 12, 44);
+      ctx.fillText(line1 || "", 12, 44);
+      ctx.fillStyle = "#9aa0a6";
+      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.lineWidth = 5;
+      ctx.font = "22px system-ui, sans-serif";
+      if (line2) {
+        ctx.strokeText(line2, 12, 82);
+        ctx.fillText(line2, 12, 82);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: false });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(118, 40), material);
+      return mesh;
     }
 
     function roundRect(ctx, x, y, w, h, r) {
