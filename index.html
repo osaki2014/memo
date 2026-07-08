@@ -347,33 +347,6 @@
       transform: rotateX(-26deg) rotateY(38deg);
     }
 
-    .cube-hit {
-      position: absolute;
-      z-index: 30;
-      min-width: 0;
-      height: auto;
-      padding: 0;
-      border: 0;
-      border-radius: 4px;
-      background: rgba(26,115,232,0);
-      box-shadow: none !important;
-      color: transparent;
-      transform: none !important;
-      pointer-events: auto;
-    }
-
-    .cube-hit:hover {
-      background: rgba(26,115,232,.12);
-      transform: none;
-    }
-
-    .cube-hit[data-hit-view="top"] { left: 28px; top: 4px; width: 52px; height: 30px; }
-    .cube-hit[data-hit-view="bottom"] { left: 28px; bottom: 4px; width: 52px; height: 30px; }
-    .cube-hit[data-hit-view="left"] { left: 2px; top: 34px; width: 34px; height: 48px; }
-    .cube-hit[data-hit-view="right"] { right: 2px; top: 34px; width: 34px; height: 48px; }
-    .cube-hit[data-hit-view="front"] { left: 39px; top: 39px; width: 34px; height: 34px; }
-    .cube-hit[data-hit-view="back"] { right: 22px; top: 22px; width: 30px; height: 30px; }
-
     .tag-shelf {
       position: sticky;
       top: 10px;
@@ -498,7 +471,8 @@
       width: 10px;
     }
 
-    .note.edge-drag {
+    .note.edge-drag,
+    .child-note.edge-drag {
       cursor: grab;
     }
 
@@ -1875,15 +1849,14 @@
               <button type="button" data-view="top" class="${active("top")}">上</button>
               <button type="button" data-view="bottom" class="${active("bottom")}">下</button>
             </div>
-            ${["top", "bottom", "left", "right", "front", "back"].map(view => `<button type="button" class="cube-hit${active(view)}" data-hit-view="${view}" aria-label="${view}"></button>`).join("")}
           </div>
         </div>
       `;
     }
 
     function wireTag3DControls() {
-      el.canvas.querySelectorAll("[data-view],[data-hit-view]").forEach(button => {
-        const readView = () => button.dataset.view || button.dataset.hitView;
+      el.canvas.querySelectorAll(".view-cube-shell [data-view]").forEach(button => {
+        const readView = () => button.dataset.view;
         const chooseView = (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1898,12 +1871,12 @@
       const shell = el.canvas.querySelector(".view-cube-shell");
       if (!cube || !shell) return;
       cube.addEventListener("click", (event) => {
-        const face = event.target.closest("[data-view],[data-hit-view]");
+        const face = event.target.closest(".view-cube-shell [data-view]");
         if (face) {
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
-          setTag3DView(face.dataset.view || face.dataset.hitView);
+          setTag3DView(face.dataset.view);
           return;
         }
         if (viewCubeDrag) return;
@@ -1911,7 +1884,7 @@
         if (view) setTag3DView(view);
       }, true);
       cube.addEventListener("pointerdown", (event) => {
-        if (event.target.closest("[data-view],[data-hit-view]")) return;
+        if (event.target.closest(".view-cube-shell [data-view]")) return;
         event.preventDefault();
         cube.setPointerCapture(event.pointerId);
         cube.classList.add("dragging");
@@ -1944,7 +1917,6 @@
       tag3dView = view || "front";
       el.canvas.className = `canvas tag-3d view-${tag3dView}`;
       el.canvas.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === tag3dView));
-      el.canvas.querySelectorAll("[data-hit-view]").forEach(item => item.classList.toggle("active", item.dataset.hitView === tag3dView));
       if (tag3dRuntime?.camera) {
         setTag3DCamera(tag3dRuntime.camera);
         tag3dRuntime.controls?.target.set(0, -120, 60);
@@ -2010,8 +1982,10 @@
       return Math.max(42, Math.min(maxHeight, preferred));
     }
 
-    function wireMarkdownBody(scope, note) {
-      const preview = scope.querySelector(".markdown-preview");
+    function wireMarkdownBody(scope, note, baseSelector = "") {
+      const previewSelector = baseSelector ? `${baseSelector}.markdown-preview` : ".markdown-preview";
+      const textareaSelector = baseSelector ? `${baseSelector}` : "textarea";
+      const preview = scope.querySelector(previewSelector);
       if (preview) {
         preview.addEventListener("mousedown", (event) => markTextResizeGesture(event, preview));
         preview.addEventListener("contextmenu", (event) => {
@@ -2024,7 +1998,7 @@
         preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
         return;
       }
-      const textarea = scope.querySelector("textarea");
+      const textarea = scope.querySelector(textareaSelector);
       if (!textarea) return;
       textarea.addEventListener("mousedown", (event) => markTextResizeGesture(event, textarea));
       textarea.addEventListener("contextmenu", (event) => {
@@ -2339,6 +2313,7 @@
         `;
 
         card.addEventListener("pointerdown", (event) => {
+          if (event.target.closest(".child-note")) return;
           if (event.target === card || isNoteEdgePointer(event, card)) {
             startDrag(event, note, card);
             return;
@@ -2355,6 +2330,10 @@
           document.querySelectorAll(".note").forEach(n => n.classList.toggle("selected", n.dataset.id === selectedId || selectedRootIds.has(n.dataset.id)));
         });
         card.addEventListener("mousemove", (event) => {
+          if (event.target.closest(".child-note")) {
+            card.classList.remove("edge-drag");
+            return;
+          }
           card.classList.toggle("edge-drag", isNoteEdgePointer(event, card));
         });
         card.addEventListener("mouseleave", () => card.classList.remove("edge-drag"));
@@ -2368,7 +2347,7 @@
           if (event.target.closest("button,input")) return;
           startMouseDrag(event, note, card);
         });
-        const resizeHandle = card.querySelector(".note-resize");
+        const resizeHandle = Array.from(card.children).find(child => child.classList?.contains("note-resize"));
         resizeHandle.addEventListener("pointerdown", (event) => startNoteResize(event, note, card), true);
         resizeHandle.addEventListener("mousedown", (event) => startNoteMouseResize(event, note, card), true);
         card.addEventListener("contextmenu", (event) => openNoteContextMenu(event, note));
@@ -2387,7 +2366,7 @@
           render();
         });
 
-        wireMarkdownBody(card, note);
+        wireMarkdownBody(card, note, ".note-text");
 
         card.querySelector(".image").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -2475,6 +2454,10 @@
           renderSidePanel();
           document.querySelectorAll(".child-note").forEach(item => item.classList.toggle("selected", item.dataset.childId === selectedId));
         });
+        childCard.addEventListener("mousemove", (event) => {
+          childCard.classList.toggle("edge-drag", isNoteEdgePointer(event, childCard));
+        });
+        childCard.addEventListener("mouseleave", () => childCard.classList.remove("edge-drag"));
 
         childCard.addEventListener("dblclick", (event) => {
           if (event.target.closest("button,textarea")) return;
@@ -2503,7 +2486,7 @@
 
         wireMarkdownBody(childCard, child);
 
-        const resizeHandle = childCard.querySelector(".note-resize");
+        const resizeHandle = Array.from(childCard.children).find(child => child.classList?.contains("note-resize"));
         resizeHandle.addEventListener("pointerdown", (event) => startNoteResize(event, child, childCard), true);
         resizeHandle.addEventListener("mousedown", (event) => startNoteMouseResize(event, child, childCard), true);
 
@@ -3228,13 +3211,22 @@
         ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`)
         : document.querySelector(`.note[data-id="${drag.id}"]`);
       if (!note || !card) return;
-      const parentBox = note.parentId ? card.parentElement : null;
-      const maxW = parentBox ? Math.max(150, parentBox.clientWidth - (note.localX || 0) - 8) : 1200;
-      const maxH = parentBox ? Math.max(110, parentBox.clientHeight - (note.localY || 0) - 8) : 900;
+      const maxW = note.parentId ? 900 : 1200;
+      const maxH = note.parentId ? 700 : 900;
       note.w = Math.min(maxW, Math.max(note.parentId ? 170 : 220, Math.round(drag.startW + (clientX - drag.startX) / boardZoom)));
       note.h = Math.min(maxH, Math.max(note.parentId ? 130 : 150, Math.round(drag.startH + (clientY - drag.startY) / boardZoom)));
       card.style.width = `${note.w}px`;
       card.style.height = `${note.h}px`;
+      if (note.parentId) {
+        const parent = findNote(note.parentId);
+        if (parent && ensureParentFitsChildren(parent)) {
+          const parentCard = document.querySelector(`.note[data-id="${parent.id}"]`);
+          if (parentCard) {
+            parentCard.style.width = `${parent.w}px`;
+            parentCard.style.height = `${parent.h}px`;
+          }
+        }
+      }
     }
 
     function endNoteResize(event) {
