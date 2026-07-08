@@ -210,7 +210,7 @@
     .markdown-preview {
       width: 100%;
       min-height: 56px;
-      max-height: 128px;
+      max-height: none;
       color: var(--ink);
       line-height: 1.22;
       font-size: var(--note-font-size, 12px);
@@ -219,7 +219,7 @@
       overflow: auto;
       border: 1px solid transparent;
       border-radius: 6px;
-      resize: horizontal;
+      resize: both;
     }
 
     .markdown-preview h1,
@@ -605,8 +605,8 @@
     .markdown-preview {
       width: 100%;
       min-height: 56px;
-      max-width: 100%;
-      max-height: var(--text-max-height, 150px);
+      max-width: none;
+      max-height: none;
       border: 1px solid transparent;
       border-radius: 6px;
       outline: none;
@@ -617,7 +617,7 @@
       font-size: var(--note-font-size, 12px);
       font-family: var(--note-font-family, system-ui, sans-serif);
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: auto;
       box-sizing: border-box;
     }
 
@@ -1868,14 +1868,14 @@
         <div class="tag-3d-controls">
           <div class="view-cube" aria-label="ビューキューブ">
             <div class="view-cube-shell">
-              <button data-view="front" class="${active("front")}">前</button>
-              <button data-view="back" class="${active("back")}">後</button>
-              <button data-view="right" class="${active("right")}">右</button>
-              <button data-view="left" class="${active("left")}">左</button>
-              <button data-view="top" class="${active("top")}">上</button>
-              <button data-view="bottom" class="${active("bottom")}">下</button>
+              <button type="button" data-view="front" class="${active("front")}">前</button>
+              <button type="button" data-view="back" class="${active("back")}">後</button>
+              <button type="button" data-view="right" class="${active("right")}">右</button>
+              <button type="button" data-view="left" class="${active("left")}">左</button>
+              <button type="button" data-view="top" class="${active("top")}">上</button>
+              <button type="button" data-view="bottom" class="${active("bottom")}">下</button>
             </div>
-            ${["top", "bottom", "left", "right", "front", "back"].map(view => `<button class="cube-hit${active(view)}" data-hit-view="${view}" aria-label="${view}"></button>`).join("")}
+            ${["top", "bottom", "left", "right", "front", "back"].map(view => `<button type="button" class="cube-hit${active(view)}" data-hit-view="${view}" aria-label="${view}"></button>`).join("")}
           </div>
         </div>
       `;
@@ -1884,16 +1884,15 @@
     function wireTag3DControls() {
       el.canvas.querySelectorAll("[data-view],[data-hit-view]").forEach(button => {
         const readView = () => button.dataset.view || button.dataset.hitView;
-        button.addEventListener("pointerdown", (event) => {
+        const chooseView = (event) => {
           event.preventDefault();
           event.stopPropagation();
+          event.stopImmediatePropagation?.();
           setTag3DView(readView());
-        });
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setTag3DView(readView());
-        });
+        };
+        button.addEventListener("pointerdown", chooseView, true);
+        button.addEventListener("mousedown", chooseView, true);
+        button.addEventListener("click", chooseView, true);
       });
       const cube = el.canvas.querySelector(".view-cube");
       const shell = el.canvas.querySelector(".view-cube-shell");
@@ -2019,8 +2018,8 @@
           if (hasTextSelection(preview)) openTextContextMenu(event, note, preview);
         });
         preview.addEventListener("mouseup", () => {
-          rememberTextFieldSize(note, preview);
           growNoteForTextField(note, preview);
+          rememberTextFieldSize(note, preview);
         });
         preview.addEventListener("blur", () => updateNoteText(note, htmlToMarkdown(preview)));
         return;
@@ -2036,8 +2035,8 @@
         growNoteForTextField(note, textarea);
       });
       textarea.addEventListener("mouseup", () => {
-        rememberTextFieldSize(note, textarea);
         growNoteForTextField(note, textarea);
+        rememberTextFieldSize(note, textarea);
       });
       textarea.addEventListener("change", () => updateNoteText(note, textarea.value));
     }
@@ -2066,14 +2065,12 @@
       const nearRight = rect.right - event.clientX <= 18;
       const nearBottom = rect.bottom - event.clientY <= 18;
       field.dataset.resizeGesture = nearRight || nearBottom ? "true" : "";
+      field.dataset.resizeStartWidth = String(rect.width / boardZoom);
+      field.dataset.resizeStartHeight = String(rect.height / boardZoom);
     }
 
     function maxTextHeightForNote(note) {
-      const base = Math.max(52, (note.h || 188) - (note.parentId ? 102 : 122));
-      const children = childNotes(note.id);
-      if (!children.length) return base;
-      const firstChildTop = Math.min(...children.map(child => child.localY || 8));
-      return Math.max(42, Math.min(base, firstChildTop + 10));
+      return Math.max(52, (note.h || 188) - (note.parentId ? 102 : 122));
     }
 
     function growNoteForTextField(note, field) {
@@ -2087,11 +2084,20 @@
       const rightOverflow = Math.ceil((fieldRect.right - (cardRect.right - 16)) / boardZoom);
       const bottomOverflow = Math.ceil((fieldRect.bottom - (cardRect.bottom - 18)) / boardZoom);
       const resizedAtEdge = field.dataset.resizeGesture === "true";
+      const startFieldWidth = Number.parseFloat(field.dataset.resizeStartWidth || "");
+      const startFieldHeight = Number.parseFloat(field.dataset.resizeStartHeight || "");
+      const currentFieldWidth = fieldRect.width / boardZoom;
+      const currentFieldHeight = fieldRect.height / boardZoom;
+      const widthDelta = Number.isFinite(startFieldWidth) ? Math.max(0, currentFieldWidth - startFieldWidth) : 0;
+      const heightDelta = Number.isFinite(startFieldHeight) ? Math.max(0, currentFieldHeight - startFieldHeight) : 0;
       const nearRightEdge = cardRect.right - fieldRect.right <= 24;
       const nearBottomEdge = cardRect.bottom - fieldRect.bottom <= 24;
       let changed = false;
       if (rightOverflow > 0) {
         note.w = Math.min(1400, (note.w || card.offsetWidth || 260) + rightOverflow + 28);
+        changed = true;
+      } else if (resizedAtEdge && widthDelta > 1) {
+        note.w = Math.min(1400, (note.w || card.offsetWidth || 260) + Math.ceil(widthDelta) + 28);
         changed = true;
       } else if (resizedAtEdge && nearRightEdge) {
         note.w = Math.min(1400, (note.w || card.offsetWidth || 260) + 96);
@@ -2100,17 +2106,20 @@
       }
       if (bottomOverflow > 0) {
         const delta = bottomOverflow + 28;
-        pushChildrenDownForTextResize(note, delta);
         note.h = Math.min(1200, (note.h || card.offsetHeight || 188) + delta);
+        changed = true;
+      } else if (resizedAtEdge && heightDelta > 1) {
+        note.h = Math.min(1200, (note.h || card.offsetHeight || 188) + Math.ceil(heightDelta) + 28);
         changed = true;
       } else if (resizedAtEdge && nearBottomEdge) {
         const delta = 96;
-        pushChildrenDownForTextResize(note, delta);
         note.h = Math.min(1200, (note.h || card.offsetHeight || 188) + delta);
         note.textHeight = `${Math.min(maxTextHeightForNote(note), Math.max(42, Number.parseFloat(note.textHeight || "") || fieldRect.height / boardZoom))}px`;
         changed = true;
       }
       field.dataset.resizeGesture = "";
+      field.dataset.resizeStartWidth = "";
+      field.dataset.resizeStartHeight = "";
       if (!changed) return;
       autoFitNoteInternals(note);
       if (note.parentId) {
@@ -2120,14 +2129,6 @@
       note.updatedAt = now();
       persist();
       renderNotes();
-    }
-
-    function pushChildrenDownForTextResize(note, delta) {
-      const children = childNotes(note.id);
-      if (!children.length || delta <= 0) return;
-      children.forEach(child => {
-        child.localY = (child.localY || 8) + delta;
-      });
     }
 
     function autoFitNoteInternals(note) {
@@ -3237,10 +3238,13 @@
     }
 
     function endNoteResize(event) {
-      const note = drag ? findNote(drag.id) : null;
-      const card = note?.parentId
-        ? document.querySelector(`.child-note[data-child-id="${drag.id}"]`)
-        : document.querySelector(`.note[data-id="${drag.id}"]`);
+      const dragId = drag?.id || "";
+      const note = dragId ? findNote(dragId) : null;
+      const card = dragId
+        ? (note?.parentId
+          ? document.querySelector(`.child-note[data-child-id="${dragId}"]`)
+          : document.querySelector(`.note[data-id="${dragId}"]`))
+        : null;
       if (card) {
         card.classList.remove("dragging");
       }
