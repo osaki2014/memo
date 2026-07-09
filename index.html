@@ -791,6 +791,28 @@
       font-size: 12px;
     }
 
+    .color-palette-menu {
+      grid-template-columns: repeat(7, 28px);
+      min-width: auto;
+      gap: 6px;
+      padding: 8px;
+    }
+
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      min-width: 0;
+      padding: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(60,64,67,.22);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.65);
+    }
+
+    .color-swatch.active {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
     .move-arrow {
       position: absolute;
       z-index: 60;
@@ -1547,6 +1569,8 @@
         lastText: note.lastText ?? note.text ?? "",
         localX: Number.isFinite(note.localX) ? note.localX : 8,
         localY: Number.isFinite(note.localY) ? note.localY : 8,
+        x: Number.isFinite(note.x) ? note.x : 80,
+        y: Number.isFinite(note.y) ? note.y : 80,
         w: note.w || 260,
         h: note.h || 188,
         textSize: note.textSize || "",
@@ -2263,7 +2287,6 @@
         fittedAny = ensureParentFitsChildren(parent) || fittedAny;
       });
       if (fittedAny) persist();
-      if (!isTag3D && !skipAutoResolveOnce) resolveRootOverlaps(null, 1);
       skipAutoResolveOnce = false;
       const notes = [...state.notes]
         .filter(note => !note.parentId)
@@ -2297,6 +2320,7 @@
           <div class="note-head">
             <input class="note-title" value="${escapeAttr(note.title)}" aria-label="タイトル">
             <span class="head-actions">
+              <button class="color" title="色を変更">${iconPalette()}</button>
               <button class="image" title="画像を追加">${iconImage()}</button>
               <button class="history" title="このメモの履歴">${iconHistory()}</button>
               <button class="delete" title="削除">${iconTrash()}</button>
@@ -2368,6 +2392,11 @@
 
         wireMarkdownBody(card, note, ".note-text");
 
+        card.querySelector(".color").addEventListener("click", (event) => {
+          event.stopPropagation();
+          openColorPalette(event, note);
+        });
+
         card.querySelector(".image").addEventListener("click", (event) => {
           event.stopPropagation();
           imageTargetId = note.id;
@@ -2395,17 +2424,6 @@
 
         wireChildNotes(card);
 
-        card.addEventListener("mouseup", () => {
-          const rect = card.getBoundingClientRect();
-          const canvasRect = el.canvas.getBoundingClientRect();
-          note.w = Math.round(rect.width / boardZoom);
-          note.h = Math.round(rect.height / boardZoom);
-          note.x = Math.round((rect.left - canvasRect.left) / boardZoom);
-          note.y = Math.round((rect.top - canvasRect.top) / boardZoom);
-          resolveRootOverlaps(null, 1);
-          persist();
-        });
-
         el.canvas.appendChild(card);
       });
       wireTagStickers(el.canvas);
@@ -2422,6 +2440,7 @@
           <div class="child-head">
             <input class="child-title" value="${escapeAttr(child.title)}" aria-label="子メモタイトル">
             <span class="head-actions">
+              <button class="child-color" title="色を変更">${iconPalette()}</button>
               <button class="child-image" title="画像を追加">${iconImage()}</button>
               <button class="child-history" title="このメモの履歴">${iconHistory()}</button>
               <button class="child-delete" title="削除">${iconTrash()}</button>
@@ -2489,6 +2508,11 @@
         const resizeHandle = Array.from(childCard.children).find(child => child.classList?.contains("note-resize"));
         resizeHandle.addEventListener("pointerdown", (event) => startNoteResize(event, child, childCard), true);
         resizeHandle.addEventListener("mousedown", (event) => startNoteMouseResize(event, child, childCard), true);
+
+        childCard.querySelector(".child-color").addEventListener("click", (event) => {
+          event.stopPropagation();
+          openColorPalette(event, child);
+        });
 
         childCard.querySelector(".child-image").addEventListener("click", (event) => {
           event.stopPropagation();
@@ -2622,6 +2646,7 @@
       menu.style.top = `${event.clientY}px`;
       menu.innerHTML = `
         <button data-action="move">${iconMove()} 移動先を指示</button>
+        <button data-action="color">${iconPalette()} 色を変更</button>
         <button data-action="image">${iconImage()} 画像を追加</button>
         <button data-action="history">${iconHistory()} 履歴を表示</button>
         <button data-action="delete">${iconTrash()} 削除</button>
@@ -2632,6 +2657,8 @@
         clickEvent.stopPropagation();
         if (action === "move") {
           startCommandMove(moveIds, note.parentId ? "child" : "root", event.clientX, event.clientY);
+        } else if (action === "color") {
+          openColorPalette(event, note, moveIds);
         } else if (action === "image") {
           imageTargetId = note.id;
           el.imageInput.click();
@@ -2651,7 +2678,7 @@
           render();
           toast(`${moveIds.length} 件のメモを削除しました`);
         }
-        closeContextMenus();
+        if (action !== "color") closeContextMenus();
       });
       document.body.appendChild(menu);
       contextMenuEl = menu;
@@ -2708,6 +2735,33 @@
       fontSelect.addEventListener("change", apply);
       document.body.appendChild(menu);
       textMenuEl = menu;
+    }
+
+    function openColorPalette(event, note, ids = [note.id]) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeContextMenus();
+      const menu = document.createElement("div");
+      menu.className = "context-menu color-palette-menu";
+      menu.style.left = `${event.clientX}px`;
+      menu.style.top = `${event.clientY}px`;
+      menu.innerHTML = palette.map(color => `
+        <button class="color-swatch${color.toLowerCase() === String(note.color).toLowerCase() ? " active" : ""}" data-color="${color}" style="background:${color}" title="${colorName(color)}"></button>
+      `).join("");
+      menu.addEventListener("click", (clickEvent) => {
+        const color = clickEvent.target.closest("[data-color]")?.dataset.color;
+        if (!color) return;
+        [...new Set(ids)].map(findNote).filter(Boolean).forEach(item => {
+          item.color = color;
+          item.updatedAt = now();
+          recordEvent(item, "full", "色変更", colorName(color));
+        });
+        persist();
+        render();
+        closeContextMenus();
+      });
+      document.body.appendChild(menu);
+      contextMenuEl = menu;
     }
 
     function closeContextMenus() {
@@ -2910,19 +2964,7 @@
     }
 
     function harmonizeChildColors() {
-      let changed = false;
-      state.notes.forEach(note => {
-        if (!note.parentId) return;
-        const parent = findNote(note.parentId);
-        if (!parent) return;
-        const siblings = childNotes(parent.id);
-        const expected = childColorFromParent(parent.color, Math.max(0, siblings.findIndex(child => child.id === note.id)));
-        if (colorName(note.color) !== colorName(parent.color)) {
-          note.color = expected;
-          changed = true;
-        }
-      });
-      if (changed) persist();
+      return;
     }
 
     function effectiveNoteColor(note) {
@@ -3245,7 +3287,6 @@
       if (note) {
         autoFitNoteInternals(note);
         note.updatedAt = now();
-        if (!note.parentId) resolveRootOverlaps(null, 1);
         const parent = note.parentId ? findNote(note.parentId) : null;
         if (parent) {
           ensureParentFitsChildren(parent);
@@ -4473,6 +4514,9 @@
     }
     function iconMove() {
       return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3 8 7M12 3l4 4M12 21l-4-4M12 21l4-4M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconPalette() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4a8 8 0 0 0 0 16h1.4a1.8 1.8 0 0 0 1.3-3.1 1.5 1.5 0 0 1 1-2.6H17a3 3 0 0 0 3-3A7.3 7.3 0 0 0 12 4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.2 11.2h.01M10 8h.01M13.4 7.7h.01M15.8 10.2h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
     }
     function iconPlus() {
       return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
